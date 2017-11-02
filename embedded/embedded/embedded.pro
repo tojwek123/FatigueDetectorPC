@@ -1,13 +1,16 @@
 TEMPLATE = app
 CONFIG += console c++11
 CONFIG -= app_bundle
-CONFIG -= qt
+#CONFIG -= qt
+
+QT += core gui printsupport
 
 SOURCES += main.cpp \
     facedetector.cpp \
     C:/Dev/dlib-19.7/dlib/all/source.cpp \
     face.cpp \
-    utils.cpp
+    utils.cpp \
+    qcustomplot.cpp
 
 win32:CONFIG(release, debug|release): LIBS += -LC:/Dev/OpenCV/opencv/build/x64/vc14/lib/ -lopencv_world320
 else:win32:CONFIG(debug, debug|release): LIBS += -LC:/Dev/OpenCV/opencv/build/x64/vc14/lib/ -lopencv_world320d
@@ -26,6 +29,7 @@ HEADERS += \
     facedetector.h \
     face.h \
     facelandmark68.h \
-    utils.h
+    utils.h \
+    qcustomplot.h
 
 #QMAKE_CXXFLAGS += -O2
