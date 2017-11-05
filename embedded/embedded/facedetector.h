@@ -1,15 +1,14 @@
 #ifndef FACEDETECTOR_H
 #define FACEDETECTOR_H
 
-#include <vector>
-#include <string>
+#include <QVector>
+#include <QString>
 #include <opencv2/opencv.hpp>
 #include <dlib/image_processing/frontal_face_detector.h>
 #include <dlib/image_processing/shape_predictor.h>
 #include <dlib/opencv.h>
+#include "config.h"
 
-using std::vector;
-using std::string;
 using cv::Point;
 
 class FaceDetector
@@ -20,8 +19,8 @@ private:
 
 public:
     FaceDetector();
-    void loadPredictorData(string predictorFile);
-    vector<vector<Point>> detect(const cv::Mat &im);
+    void loadPredictorData(const QString &predictorFile);
+    QVector<QVector<Point>> detect(const cv::Mat &im);
 };
 
 #endif // FACEDETECTOR_H
