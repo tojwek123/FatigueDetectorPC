@@ -39,6 +39,7 @@ void FatigueDetector::detect()
     m_cap >> frame;
 
     cv::pyrDown(frame, frame);
+    cv::pyrDown(frame, frame);
     auto faces = m_faceDetector.detect(frame);
 
     FatigueDetectorStat stat;

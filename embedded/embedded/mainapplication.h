@@ -32,7 +32,12 @@ private:
     QTextStream m_logger;
     QElapsedTimer m_perfTimer;
 
-    const QString PredictorFilename = "/home/pi/FatigueDetector/shape_predictor_68_face_landmarks.dat";//C:\\Dev\\dlib-19.7\\resources\\shape_predictor_68_face_landmarks.dat";
+#ifdef _WIN32
+    const QString PredictorFilename = "C:\\Dev\\dlib-19.7\\resources\\shape_predictor_68_face_landmarks.dat";
+#else
+    const QString PredictorFilename = "/home/pi/FatigueDetector/shape_predictor_68_face_landmarks.dat";
+#endif
+
 public:
     explicit MainApplication(int &argc, char **argv);
     ~MainApplication();

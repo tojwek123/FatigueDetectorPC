@@ -3,6 +3,7 @@
 
 #include <QVector>
 #include <QString>
+#include <QElapsedTimer>
 #include <opencv2/opencv.hpp>
 #include <dlib/image_processing/frontal_face_detector.h>
 #include <dlib/image_processing/shape_predictor.h>
@@ -14,7 +15,8 @@ using cv::Point;
 class FaceDetector
 {
 private:
-    dlib::frontal_face_detector m_detector;
+    cv::CascadeClassifier m_detector;
+    //dlib::frontal_face_detector m_detector;
     dlib::shape_predictor m_predictor;
 
 public:

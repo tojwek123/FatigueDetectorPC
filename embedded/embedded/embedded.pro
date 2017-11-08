@@ -52,7 +52,7 @@ HEADERS += \
 	    testwindow.h \
 	    config.h
 
-target.path = /home/pi/FatigueDetector
-INSTALLS += target
+unix:target.path = /home/pi/FatigueDetector
+unix:INSTALLS += target
 
 QMAKE_CXXFLAGS += -O2

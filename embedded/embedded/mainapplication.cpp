@@ -49,7 +49,6 @@ void MainApplication::onPredictorDataLoaded(bool success)
     if (success)
     {
         m_logger << "Predictor data loaded" << endl;
-        m_logger << "Predictor data loaded" << endl;
         m_logger << "Opening camera..." << endl;
         emit openCamera();
     }
