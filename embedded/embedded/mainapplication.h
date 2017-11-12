@@ -8,7 +8,7 @@
 #include "config.h"
 #include "fatiguedetector.h"
 
-#ifdef APP_TYPE_GUI
+#ifdef CFG_APP_TYPE_GUI
     #include "testwindow.h"
     #include <QPushButton>
     #include <QApplication>
@@ -23,7 +23,7 @@ class MainApplication : public APPLICATION_BASE_CLASS
     Q_OBJECT
 private:
 
-#ifdef APP_TYPE_GUI
+#ifdef CFG_APP_TYPE_GUI
     TestWindow m_testWindow;
 #endif
 
@@ -32,22 +32,16 @@ private:
     QTextStream m_logger;
     QElapsedTimer m_perfTimer;
 
-#ifdef _WIN32
-    const QString PredictorFilename = "C:\\Dev\\dlib-19.7\\resources\\shape_predictor_68_face_landmarks.dat";
-#else
-    const QString PredictorFilename = "/home/pi/FatigueDetector/shape_predictor_68_face_landmarks.dat";
-#endif
-
 public:
     explicit MainApplication(int &argc, char **argv);
     ~MainApplication();
 signals:
-    void loadPredictorData(const QString filename);
+    void loadDetectorDataFiles();
     void openCamera(int index = 0);
     void detect();
 
 public slots:
-    void onPredictorDataLoaded(bool success);
+    void onDetectorDataFilesLoaded(bool success);
     void onCameraOpened(bool success);
     void onDetected(bool success, FatigueDetectorStat stat);
 };

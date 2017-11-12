@@ -7,19 +7,9 @@ FatigueDetector::FatigueDetector(QObject *parent) :
 
 }
 
-bool FatigueDetector::loadPredictorData(const QString filename)
+bool FatigueDetector::loadDataFiles()
 {
-    bool success = true;
-
-    try
-    {
-        m_faceDetector.loadPredictorData(filename);
-    }
-    catch (...)
-    {
-        success = false;
-    }
-
+    bool success = m_faceDetector.loadDataFiles();
     emit predictorDataLoaded(success);
     return success;
 }
@@ -66,7 +56,7 @@ void FatigueDetector::detect()
         break;
     }
 
-#ifdef APP_TYPE_GUI
+#ifdef CFG_APP_TYPE_GUI
     cv::imshow("Frame", frame);
     cv::waitKey(1);
 #endif

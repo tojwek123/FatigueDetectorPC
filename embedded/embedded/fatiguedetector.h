@@ -32,7 +32,7 @@ signals:
 
 public slots:
     bool openCamera(int index = 0);
-    bool loadPredictorData(const QString filename);
+    bool loadDataFiles();
     void detect();
 };
 

@@ -4,6 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <cmath>
 #include <QVector>
+#include <dlib/geometry/rectangle.h>
 
 #ifdef _WIN32
     #include <Windows.h>
@@ -28,6 +29,8 @@ namespace Utils
                        const int lineType = 8);
 
     void beep(int freq, int duration);
+
+    inline dlib::rectangle cvToDlibRect(const cv::Rect &rect) { return dlib::rectangle(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height); }
 
     template<typename T>
     QVector<T> sliceVect(const QVector<T> &src, int start, int end);

@@ -8,25 +8,25 @@ MainApplication::MainApplication(int &argc, char **argv) :
 
     /* Signals from FatigueDetector */
     connect(&m_fatigueDetector, &FatigueDetector::predictorDataLoaded,
-            this, &MainApplication::onPredictorDataLoaded);
+            this, &MainApplication::onDetectorDataFilesLoaded);
     connect(&m_fatigueDetector, &FatigueDetector::cameraOpened,
             this, &MainApplication::onCameraOpened);
     connect(&m_fatigueDetector, &FatigueDetector::detected,
             this, &MainApplication::onDetected);
-#ifdef APP_TYPE_GUI
+#ifdef CFG_APP_TYPE_GUI
     connect(&m_fatigueDetector, &FatigueDetector::detected,
             &m_testWindow, &TestWindow::onDetected);
 #endif
 
     /* Signals from MainApplication */
-    connect(this, &MainApplication::loadPredictorData,
-            &m_fatigueDetector, &FatigueDetector::loadPredictorData);
+    connect(this, &MainApplication::loadDetectorDataFiles,
+            &m_fatigueDetector, &FatigueDetector::loadDataFiles);
     connect(this, &MainApplication::openCamera,
             &m_fatigueDetector, &FatigueDetector::openCamera);
     connect(this, &MainApplication::detect,
             &m_fatigueDetector, &FatigueDetector::detect);
 
-#ifdef APP_TYPE_GUI
+#ifdef CFG_APP_TYPE_GUI
     m_testWindow.show();
 #endif
 
@@ -34,8 +34,8 @@ MainApplication::MainApplication(int &argc, char **argv) :
 
     m_fatigueDetector.moveToThread(&m_fatigueDetectorThread);
     m_fatigueDetectorThread.start();
-    m_logger << "Loading predictor data..." << endl;
-    emit loadPredictorData(PredictorFilename);
+    m_logger << "Loading detector data files..." << endl;
+    emit loadDetectorDataFiles();
 }
 
 MainApplication::~MainApplication()
@@ -44,17 +44,17 @@ MainApplication::~MainApplication()
     m_fatigueDetectorThread.wait();
 }
 
-void MainApplication::onPredictorDataLoaded(bool success)
+void MainApplication::onDetectorDataFilesLoaded(bool success)
 {
     if (success)
     {
-        m_logger << "Predictor data loaded" << endl;
+        m_logger << "Data files successfully loaded" << endl;
         m_logger << "Opening camera..." << endl;
         emit openCamera();
     }
     else
     {
-        m_logger << "Unable to load predictor data" << endl;
+        m_logger << "Unable to load detector data files" << endl;
     }
 }
 
@@ -77,7 +77,7 @@ void MainApplication::onDetected(bool success, FatigueDetectorStat stat)
 
     if (success)
     {
-        m_logger << stat.avgEAR << endl;
+        m_logger << "avgEAR: " << stat.avgEAR << endl;
     }
     emit detect();
 }

@@ -2,40 +2,52 @@
 
 FaceDetector::FaceDetector()
 {
-    //m_detector = dlib::get_frontal_face_detector();
-    if (!m_detector.load("/home/pi/FatigueDetector/haarcascade_frontalface_alt.xml"))//"C:\\Dev\\OpenCV\\opencv\\sources\\data\\haarcascades\\haarcascade_frontalface_alt.xml"))
-    {
-        std::cout << "Zesralo sie!" << std::endl;
-    }
+#if CFG_FACE_DETECTOR == DLIB_FRONTAL_FACE_DETECTOR
+    m_detector = dlib::get_frontal_face_detector();
+#endif
 }
 
-void FaceDetector::loadPredictorData(const QString &predictorFile)
+bool FaceDetector::loadDataFiles()
 {
-    dlib::deserialize(predictorFile.toStdString()) >> m_predictor;
+#if CFG_FACE_DETECTOR == CV_CASCADE_CLASSIFIER
+    if (!m_detector.load(CFG_CV_CASCADE_CLASSIFIER_DATA_PATH))
+    {
+        return false;
+    }
+#endif
+
+    try
+    {
+        dlib::deserialize(CFG_PREDICTOR_DATA_PATH) >> m_predictor;
+    }
+    catch (...)
+    {
+        return false;
+    }
+    return true;
 }
 
 QVector<QVector<Point>> FaceDetector::detect(const cv::Mat &im)
 {
-    QElapsedTimer perfTimer;
-
-    perfTimer.start();
     QVector<QVector<Point>> faces;
+    dlib::cv_image<dlib::bgr_pixel> wrappedIm(im);
 
-    std::vector<cv::Rect> rects;
+#if CFG_FACE_DETECTOR == CV_CASCADE_CLASSIFIER
+    std::vector<cv::Rect> cvRects;
+    std::vector<dlib::rectangle> rects;
     cv::Mat imGray = im.clone();
     cv::cvtColor(imGray, imGray, cv::COLOR_BGR2GRAY);
     cv::equalizeHist(imGray, imGray);
-    m_detector.detectMultiScale(imGray, rects, 1.1, 5, cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30));
-
-    dlib::cv_image<dlib::bgr_pixel> wrappedIm(im);
-    //auto rects = m_detector(wrappedIm, 0);
-    std::cout << "m_detector: " << perfTimer.elapsed() << "ms" << std::endl;
+    m_detector.detectMultiScale(imGray, cvRects, 1.1, 5, cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30));
+    for (auto i : cvRects) { rects.push_back(Utils::cvToDlibRect(i)); }
+#elif CFG_FACE_DETECTOR == DLIB_FRONTAL_FACE_DETECTOR
+    auto rects = m_detector(wrappedIm, 0);
+#endif
 
     for (auto rect : rects)
     {
         QVector<Point> face;
-        auto dlibRect = dlib::rectangle(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height);
-        auto objDetect = m_predictor(wrappedIm, dlibRect);
+        auto objDetect = m_predictor(wrappedIm, rect);
 
         for (auto i = 0u; i < objDetect.num_parts(); ++i)
         {

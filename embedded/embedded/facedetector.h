@@ -8,6 +8,7 @@
 #include <dlib/image_processing/frontal_face_detector.h>
 #include <dlib/image_processing/shape_predictor.h>
 #include <dlib/opencv.h>
+#include "utils.h"
 #include "config.h"
 
 using cv::Point;
@@ -15,13 +16,17 @@ using cv::Point;
 class FaceDetector
 {
 private:
+#if CFG_FACE_DETECTOR == CV_CASCADE_CLASSIFIER
     cv::CascadeClassifier m_detector;
-    //dlib::frontal_face_detector m_detector;
+#elif CFG_FACE_DETECTOR == DLIB_FRONTAL_FACE_DETECTOR
+    dlib::frontal_face_detector m_detector;
+#endif
+
     dlib::shape_predictor m_predictor;
 
 public:
     FaceDetector();
-    void loadPredictorData(const QString &predictorFile);
+    bool loadDataFiles();
     QVector<QVector<Point>> detect(const cv::Mat &im);
 };
 
