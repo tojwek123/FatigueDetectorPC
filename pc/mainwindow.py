@@ -1,21 +1,12 @@
-from PyQt5.QtCore import pyqtSlot
-from PyQt5.QtWidgets import QMainWindow
-from PyQt5.QtWidgets import QStatusBar
-from PyQt5.QtWidgets import QLabel
-from PyQt5.QtWidgets import QAction
-from PyQt5.QtWidgets import QMessageBox
-from PyQt5.QtWidgets import QGridLayout
-from PyQt5.QtWidgets import QSizePolicy
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtWidgets import QPushButton
-from PyQt5.QtCore import QTimer
-from PyQt5.QtNetwork import QTcpSocket, QHostAddress, QAbstractSocket
-from PyQt5.QtCore import QSettings
-from PyQt5.QtCore import QDir
-from PyQt5.QtGui import QImage, QPixmap
-from connectionsettings import ConnectionSettings
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtNetwork import *
+from PyQt5.QtGui import *
+from connectionSettings import ConnectionSettings
+import pyqtgraph as pg
 import numpy as np
 import cv2
+
 
 class MainWindow(QMainWindow):
 
@@ -23,6 +14,7 @@ class MainWindow(QMainWindow):
     WaitingAnimationFrameDurationMs = 100
     ConnectionTimerTimeoutMs = 5000
     DataExchangeTimerTimeoutMs = 250
+    VideoStreamResolution = QSize(640, 480)
 
     def __init__(self):
         super().__init__()
@@ -52,39 +44,39 @@ class MainWindow(QMainWindow):
         self.onConnectionSettingsSettingsChanged(self.targetAddr, self.targetPort)
         self.onSocketStateChanged()
 
-    #     self.cap = cv2.VideoCapture(0)
-    #     self.dispTimer = QTimer(self)
-    #     self.dispTimer.timeout.connect(self.onDispTimerTimeout)
-    #     self.dispTimer.start(100)
-
-    # @pyqtSlot()
-    # def onDispTimerTimeout(self):
-    #     ret, frame = self.cap.read()
-    #     image = self.cvToQtIm(frame)
-    #     pixmap = QPixmap.fromImage(image)
-    #     self.streamDisp.setPixmap(pixmap)
-
     def initUI(self):
-        self.setGeometry(300, 300, 300, 300)
-        self.setWindowTitle('Diag Tool')
 
-        statusBar = QStatusBar(self)
+        pg.setConfigOption('background', 'w')
+        pg.setConfigOption('foreground', 'k')
+        self.setWindowTitle('Diag Tool')
+        self.statusBar = QStatusBar(self)
         self.targetInfo = QLabel(self)
         self.connectionStatus = QLabel(self)
-        statusBar.addWidget(self.targetInfo, 0)
-        statusBar.addWidget(self.connectionStatus, 1)
-        self.setStatusBar(statusBar)
-
-        self.streamDisp = QLabel(self)
-        self.streamDisp.setSizePolicy(QSizePolicy.MinimumExpanding,
+        self.statusBar.addWidget(self.targetInfo, 0)
+        self.statusBar.addWidget(self.connectionStatus, 1)
+        self.setStatusBar(self.statusBar)
+        self.varTable = QTableWidget(self)
+        self.varPlot = pg.PlotWidget(self)
+        self.varPlot.setEnabled(False)
+        self.console = QTextEdit(self)
+        self.console.setTextColor(QColor('white'))
+        self.console.setStyleSheet('background-color: black;')
+        self.tabWidget = QTabWidget(self)
+        self.tabWidget.addTab(self.varPlot, 'Plot')
+        self.tabWidget.addTab(self.console, 'Console')
+        self.streamView = QLabel(self)
+        self.streamView.setSizePolicy(QSizePolicy.MinimumExpanding,
                                       QSizePolicy.MinimumExpanding)
-
+        self.streamView.setFixedSize(self.VideoStreamResolution)
+        self.streamView.setStyleSheet('border: 1px solid #BEBEBE; background-color: white')
         layout = QGridLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.streamDisp, 0, 0, 0, 4)
+        layout.setContentsMargins(3, 3, 3, 3)
+        layout.setSpacing(3)
+        layout.addWidget(self.varTable, 0, 0)
+        layout.addWidget(self.streamView, 0, 1)
+        layout.addWidget(self.tabWidget, 1, 0, 1, 2)
         self.setCentralWidget(QWidget(self))
         self.centralWidget().setLayout(layout)
-
         self.menuTarget = self.menuBar().addMenu('Target')
         self.menuTargetConnect = QAction('Connect', self)
         self.menuTargetConnect.triggered.connect(self.onMenuTargetConnect)
@@ -170,7 +162,7 @@ class MainWindow(QMainWindow):
                 self.frameLength = 0
                 image = self.cvToQtIm(cvIm)
                 pixmap = QPixmap.fromImage(image)
-                self.streamDisp.setPixmap(pixmap)
+                self.streamView.setPixmap(pixmap)
 
     @pyqtSlot(str, int)
     def onConnectionSettingsSettingsChanged(self, addr, port):
