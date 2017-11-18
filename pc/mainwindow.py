@@ -6,13 +6,13 @@ from connectionSettings import ConnectionSettings
 import pyqtgraph as pg
 import numpy as np
 import cv2
-
+from remoteDataExchangerClient import RemoteDataExchangerClient
 
 class MainWindow(QMainWindow):
 
     WaitingAnimation = [' |', ' /', ' -', ' \\']
     WaitingAnimationFrameDurationMs = 100
-    ConnectionTimerTimeoutMs = 5000
+    ConnectionTimeoutMs = 5000
     DataExchangeTimerTimeoutMs = 250
     VideoStreamResolution = QSize(640, 480)
 
@@ -26,23 +26,17 @@ class MainWindow(QMainWindow):
 
         self.connectionSettings = ConnectionSettings(self.targetAddr, self.targetPort, self)
         self.connectionSettings.settingsChanged.connect(self.onConnectionSettingsSettingsChanged)
-        self.socket = QTcpSocket(self)
-        self.socket.stateChanged.connect(self.onSocketStateChanged)
-        self.socket.readyRead.connect(self.onSocketReadyRead)
-        self.frameLength = 0
-        self.lastSocketState = QAbstractSocket.UnconnectedState
+        self.target = RemoteDataExchangerClient(self)
+        self.target.stateChanged.connect(self.onTargetStateChanged)
+        self.target.variableRead.connect(self.onTargetVariableRead)
+        self.target.camFrameRead.connect(self.onTargetCamFrameRead)
+        self.lastTargetState = RemoteDataExchangerClient.StateDisconnected
         self.animationTimer = QTimer(self)
         self.animationTimer.timeout.connect(self.onAnimationTimerTimeout)
         self.animationCounter = 0
-        self.connectionTimer = QTimer(self)
-        self.connectionTimer.setSingleShot(True)
-        self.connectionTimer.timeout.connect(self.onConnectionTimerTimeout)
-        self.dataExchangeTimer = QTimer(self)
-        self.dataExchangeTimer.timeout.connect(self.onDataExchangeTimerTimeout)
 
         self.initUI()
         self.onConnectionSettingsSettingsChanged(self.targetAddr, self.targetPort)
-        self.onSocketStateChanged()
 
     def initUI(self):
 
@@ -69,12 +63,16 @@ class MainWindow(QMainWindow):
                                       QSizePolicy.MinimumExpanding)
         self.streamView.setFixedSize(self.VideoStreamResolution)
         self.streamView.setStyleSheet('border: 1px solid #BEBEBE; background-color: white')
+        self.testButton = QPushButton('test', self)
+        self.testButton.clicked.connect(self.onTestButtonClicked)
+
         layout = QGridLayout(self)
         layout.setContentsMargins(3, 3, 3, 3)
         layout.setSpacing(3)
         layout.addWidget(self.varTable, 0, 0)
         layout.addWidget(self.streamView, 0, 1)
         layout.addWidget(self.tabWidget, 1, 0, 1, 2)
+        layout.addWidget(self.testButton, 2, 0)
         self.setCentralWidget(QWidget(self))
         self.centralWidget().setLayout(layout)
         self.menuTarget = self.menuBar().addMenu('Target')
@@ -88,9 +86,27 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.writeSettings()
 
+    @pyqtSlot(bool)
+    def onTestButtonClicked(self, clicked):
+        print('testButton')
+        self.target.requestCamFrame()
+
+    @pyqtSlot(str, str)
+    def onTargetVariableRead(self, varName, varValueStr):
+        print(varName + '=' + varValueStr)
+
+    @pyqtSlot(np.ndarray)
+    def onTargetCamFrameRead(self, frame):
+        pixmap = self.cvToQtPixmap(frame)
+        self.streamView.setPixmap(pixmap)
+
     def cvToQtIm(self, cvIm):
         cvIm = cv2.cvtColor(cvIm, cv2.COLOR_BGR2RGB)
         return QImage(cvIm.data, cvIm.shape[1], cvIm.shape[0], QImage.Format_RGB888)
+
+    def cvToQtPixmap(self, cvIm):
+        qtIm = self.cvToQtIm(cvIm)
+        return QPixmap.fromImage(qtIm)
 
     def readSettings(self):
         value = self.settings.value('target/addr')
@@ -104,65 +120,42 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def onMenuTargetConnect(self):
-        if QAbstractSocket.UnconnectedState == self.socket.state():
+        if RemoteDataExchangerClient.StateDisconnected == self.target.state():
             self.menuTargetConnect.setEnabled(False)
             self.connectionSettings.setUserInputEnabled(False)
-            self.socket.connectToHost(QHostAddress(self.targetAddr), self.targetPort)
-            self.connectionTimer.start(self.ConnectionTimerTimeoutMs)
-        elif QAbstractSocket.ConnectedState == self.socket.state():
+            self.target.connect(self.targetAddr, self.targetPort, self.ConnectionTimeoutMs)
+        elif RemoteDataExchangerClient.StateConnected == self.target.state():
             self.menuTargetConnect.setEnabled(False)
-            self.socket.disconnectFromHost()
+            self.target.disconnect()
 
     @pyqtSlot()
     def onMenuTargetSettings(self):
         self.connectionSettings.show()
 
-    @pyqtSlot()
-    def onSocketStateChanged(self):
-        #print(self.socket.state())
-        if QAbstractSocket.UnconnectedState == self.socket.state():
-            self.dataExchangeTimer.timeout.emit()
-            self.dataExchangeTimer.start(self.DataExchangeTimerTimeoutMs)
+    @pyqtSlot(int)
+    def onTargetStateChanged(self, state):
+        if RemoteDataExchangerClient.StateDisconnected == state:
             self.animationTimer.stop()
             self.menuTargetConnect.setText('Connect')
             self.menuTargetConnect.setEnabled(True)
             self.connectionStatus.setText('Offline')
             self.connectionSettings.setUserInputEnabled(True)
-            if QAbstractSocket.ConnectingState == self.lastSocketState:
+            if RemoteDataExchangerClient.StateConnecting == self.lastTargetState:
                 QMessageBox.warning(self, 'Warning', 'Unable to connect!')
-        elif QAbstractSocket.ConnectedState == self.socket.state():
-            self.connectionTimer.stop()
+        elif RemoteDataExchangerClient.StateConnected == state:
             self.animationTimer.stop()
-            self.dataExchangeTimer.start()
             self.menuTargetConnect.setText('Disconnect')
             self.menuTargetConnect.setEnabled(True)
             self.connectionStatus.setText('Online')
-        elif QAbstractSocket.ConnectingState == self.socket.state():
+        elif RemoteDataExchangerClient.StateConnecting == state:
+            self.animationTimer.start(self.WaitingAnimationFrameDurationMs)
             self.connectionStatus.setText('Connecting')
             self.animationCounter = 0
+        elif RemoteDataExchangerClient.StateDisconnecting == state:
             self.animationTimer.start(self.WaitingAnimationFrameDurationMs)
-        elif QAbstractSocket.ClosingState == self.socket.state():
             self.connectionStatus.setText('Disconnecting')
             self.animationCounter = 0
-            self.animationTimer.start(self.WaitingAnimationFrameDurationMs)
-        self.lastSocketState = self.socket.state()
-
-    @pyqtSlot()
-    def onSocketReadyRead(self):
-        if 0 == self.frameLength:
-            if self.socket.canReadLine():
-                data = self.socket.readLine()[:-1]
-                self.frameLength = int(data)
-
-        if self.frameLength != 0:
-            if self.socket.bytesAvailable() >= self.frameLength:
-                data = self.socket.read(self.frameLength)
-                arr = np.frombuffer(data, dtype=np.uint8)
-                cvIm = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-                self.frameLength = 0
-                image = self.cvToQtIm(cvIm)
-                pixmap = QPixmap.fromImage(image)
-                self.streamView.setPixmap(pixmap)
+        self.lastTargetState = state
 
     @pyqtSlot(str, int)
     def onConnectionSettingsSettingsChanged(self, addr, port):
@@ -172,7 +165,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def onAnimationTimerTimeout(self):
-        if QAbstractSocket.ConnectingState == self.socket.state():
+        if RemoteDataExchangerClient.StateConnecting == self.target.state():
             text = 'Connecting'
         else:
             text = 'Disconnecting'
@@ -180,12 +173,3 @@ class MainWindow(QMainWindow):
         text += self.WaitingAnimation[self.animationCounter]
         self.animationCounter = (self.animationCounter + 1) % len(self.WaitingAnimation)
         self.connectionStatus.setText(text)
-
-    @pyqtSlot()
-    def onConnectionTimerTimeout(self):
-        self.socket.abort()
-
-    @pyqtSlot()
-    def onDataExchangeTimerTimeout(self):
-        if QAbstractSocket.ConnectedState == self.socket.state():
-            self.socket.writeData('get\n'.encode())

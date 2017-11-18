@@ -19,6 +19,8 @@ class ConnectionSettings(QDialog):
 
         self.addr = initAddr
         self.port = initPort
+        self.lastAddr = self.addr
+        self.lastPort = self.port
 
         self.initUI()
 
@@ -67,9 +69,15 @@ class ConnectionSettings(QDialog):
     @pyqtSlot(bool)
     def onOkButtonClicked(self, checked):
         self.port = self.portSpinBox.value()
+        self.lastPort = self.port
+        self.lastAddr = self.addr
         self.settingsChanged.emit(self.addr, self.port)
         self.hide()
 
     @pyqtSlot(bool)
     def onCancelButtonClicked(self, checked):
+        self.port = self.lastPort
+        self.addr = self.lastAddr
+        self.portSpinBox.setValue(self.port)
+        self.addrLineEdit.setText(self.addr)
         self.hide()
