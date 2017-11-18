@@ -21,9 +21,10 @@ class MainApp(QCoreApplication):
         self.headerTokens = []
 
         self.variables = {
-            'EAR' : ('double', 0.0),
-            'Name' : ('string', 'FatigueDetector'),
-            'Iterations' : ('int', 2)
+            'EAR' : (0.0, 'float', True),
+            'EARLimit' : (5.0, 'float', False),
+            'FatigueDetected' : (False, 'bool', True),
+            'FPS' : (10.5, 'float', True)
         }
 
     @pyqtSlot()
@@ -60,8 +61,18 @@ class MainApp(QCoreApplication):
                     break
 
     def parseMessage(self, headerTokens, data):
-        if 'reqVarVal' == headerTokens[0]:
-            self.send('varVal', 'EAR|' + str(5))
+        if 'reqVarType' == headerTokens[0]:
+            varName = str(headerTokens[1], 'utf-8')
+            if varName in self.variables:
+                if self.variables[varName][2]:
+                    access = 'r'
+                else:
+                    access = 'rw'
+                self.send('varType|' + varName, self.variables[varName][1] + '|' + access)
+        elif 'reqVarVal' == headerTokens[0]:
+            varName = str(headerTokens[1], 'utf-8')
+            if varName in self.variables:
+                self.send('varVal|' + varName, str(self.variables[varName][0]))
         elif 'reqCamFrame' == headerTokens[0]:
             ret, frame = self.cap.read()
             data = cv2.imencode('.jpg', frame)[1]
