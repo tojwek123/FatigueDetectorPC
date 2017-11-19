@@ -45,7 +45,6 @@ class MainWindow(QMainWindow):
         self.dataReadTimer = QTimer(self)
         self.dataReadTimer.timeout.connect(self.onDataReadTimerTimeout)
         self.variables = {}
-
         self.initUI()
         self.onConnectionSettingsSettingsChanged(self.targetAddr, self.targetPort)
 
@@ -66,6 +65,17 @@ class MainWindow(QMainWindow):
         self.varTable.setColumnCount(len(self.VarTableColumnsNo))
         self.varTable.setHorizontalHeaderLabels(self.VarTableColumns)
         self.varTable.setVisible(False)
+        for varName in self.VariablesToRead:
+            var = Variable(varName, len(self.variables), '', self)
+            self.variables.update({varName: var})
+            self.varTable.setRowCount(var.getRow() + 1)
+            self.varTable.setItem(var.getRow(), self.VarTableColumnsNo['Name'], var.getNameTableItem())
+            self.varTable.setItem(var.getRow(), self.VarTableColumnsNo['Value'], var.getValueTableItem())
+            self.varTable.setItem(var.getRow(), self.VarTableColumnsNo['Type'], var.getVarTypeTableItem())
+            self.varTable.setItem(var.getRow(), self.VarTableColumnsNo['Read-only'], var.getRdOnlyTableItem())
+            self.varTable.setCellWidget(var.getRow(), self.VarTableColumnsNo['Plot'], var.getPlotTableWidget())
+            self.varTable.setCellWidget(var.getRow(), self.VarTableColumnsNo['Plot color'], var.getPlotColorTableWidget())
+            self.varTable.setItem(var.getRow(), self.VarTableColumnsNo['Description'], var.getDescTableItem())
         self.varTableNotAvailableLabel = QLabel('Variables not available')
         self.varTableNotAvailableLabel.setAlignment(Qt.AlignCenter)
         self.varTableNotAvailableLabel.setMinimumWidth(400)
@@ -118,34 +128,14 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(str, str, bool)
     def onTargetVariableTypeRead(self, varName, varTypeStr, varRdOnly):
-        if varName in self.VariablesToRead:
-            self.varTable.setRowCount(len(self.variables) + 1)
-            newVar = Variable(varName, len(self.variables), '', varTypeStr, varRdOnly)
-            self.variables.update({varName: newVar})
-            self.varTable.setItem(newVar.row, self.VarTableColumnsNo['Name'], newVar.nameTableItem())
-            self.varTable.setItem(newVar.row, self.VarTableColumnsNo['Type'], newVar.varTypeTableItem())
-            self.varTable.setItem(newVar.row, self.VarTableColumnsNo['Read-only'], newVar.rdOnlyTableItem())
-            (plotTableWidget, plotSignal) = newVar.plotTableWidget()
-
-            def onPlot(state): print(onPlot.varName + ': ' + str(state))
-            onPlot.varName = varName
-
-            plotSignal.connect(onPlot)
-            self.varTable.setCellWidget(newVar.row, self.VarTableColumnsNo['Plot'], plotTableWidget)
-            (plotColorTableWidget, plotColorSignal) = newVar.plotColorTableWidget()
-
-            def onPlotColor(color): print(onPlotColor.varName + ': ' + str(color))
-            onPlotColor.varName = varName
-
-            plotColorSignal.connect(onPlotColor)
-            self.varTable.setCellWidget(newVar.row, self.VarTableColumnsNo['Plot color'], plotColorTableWidget)
+        if varName in self.variables:
+            self.variables[varName].setVarType(varTypeStr)
+            self.variables[varName].setRdOnly(varRdOnly)
 
     @pyqtSlot(str, str)
     def onTargetVariableValueRead(self, varName, varValueStr):
         if varName in self.variables:
-             var = self.variables[varName]
-             var.value = varValueStr
-             self.varTable.setItem(var.row, self.VarTableColumnsNo['Value'], var.valueTableItem())
+            self.variables[varName].setValueStr(varValueStr)
 
     @pyqtSlot()
     def onDataReadTimerTimeout(self):
@@ -198,8 +188,10 @@ class MainWindow(QMainWindow):
             self.camFrameView.setText('Camera stream not available')
             self.varTable.setVisible(False)
             self.varTableNotAvailableLabel.setVisible(True)
-            self.variables = {}
-            self.varTable.setRowCount(0)
+            for varName in self.variables:
+                self.variables[varName].setValueStr('')
+                self.variables[varName].setVarType('')
+                self.variables[varName].setRdOnly(False)
             if RemoteDataExchangerClient.StateConnecting == self.lastTargetState:
                 QMessageBox.warning(self, 'Warning', 'Unable to connect.')
             elif not self.targetDisconnectClicked:

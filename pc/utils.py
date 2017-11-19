@@ -1,5 +1,6 @@
 import cv2
-from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtWidgets import QPushButton
+from PyQt5.QtGui import QPixmap, QImage, QPalette
 
 
 def cvToQtIm(cvIm):
@@ -9,3 +10,8 @@ def cvToQtIm(cvIm):
 def cvToQtPixmap(cvIm):
     qtIm = cvToQtIm(cvIm)
     return QPixmap.fromImage(qtIm)
+
+def setButtonColor(button, color):
+    palette = button.palette()
+    palette.setColor(QPalette.Button, color)
+    button.setPalette(palette)

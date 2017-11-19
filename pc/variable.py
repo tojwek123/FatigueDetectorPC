@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
+import utils
 
 nextColor = 0
 
@@ -8,86 +9,144 @@ nextColor = 0
 class Variable(QObject):
 
     Colors = [Qt.blue, Qt.red, Qt.darkGreen, Qt.darkYellow, Qt.darkCyan]
-    colorChanged = pyqtSignal(QColor)
+    plotClicked = pyqtSignal(str, bool)
+    plotColorChanged = pyqtSignal(str, QColor)
 
-    def __init__(self, name, row, valueStr='', varType='', rdOnly=False, plot=False, color=QColor(), desc='', parent=None):
+    def __init__(self, name, row, desc='', parent=None):
+        global nextColor
         super().__init__(parent)
 
         self.name = name
         self.row = row
-        self.valueStr = valueStr
-        self.varType = varType
-        self.rdOnly = rdOnly
-        self.plot = plot
-        self.color = color
+        self.valueStr = ''
+        self.varType = ''
+        self.rdOnly = False
+        self.plot = False
+        self.plotColor = self.Colors[nextColor]
         self.desc = desc
 
-    def nameTableItem(self):
-        tableItem = QTableWidgetItem(self.name)
-        tableItem.setTextAlignment(Qt.AlignCenter)
-        return tableItem
+        nextColor = (nextColor + 1) % len(self.Colors)
 
-    def valueTableItem(self):
-        tableItem = QTableWidgetItem(self.value)
-        tableItem.setTextAlignment(Qt.AlignCenter)
-        return tableItem
+        self.nameTableItem = QTableWidgetItem(self.name)
+        self.nameTableItem.setTextAlignment(Qt.AlignCenter)
+        self.valueTableItem = QTableWidgetItem(self.valueStr)
+        self.valueTableItem.setTextAlignment(Qt.AlignCenter)
+        self.varTypeTableItem = QTableWidgetItem(self.varType)
+        self.varTypeTableItem.setTextAlignment(Qt.AlignCenter)
+        self.rdOnlyTableItem = QTableWidgetItem(str(self.rdOnly))
+        self.rdOnlyTableItem.setTextAlignment(Qt.AlignCenter)
 
-    def varTypeTableItem(self):
-        tableItem = QTableWidgetItem(self.varType)
-        tableItem.setTextAlignment(Qt.AlignCenter)
-        return tableItem
+        self.plotTableWidgetCheckbox = QCheckBox()
+        self.plotTableWidgetCheckbox.clicked.connect(self.onPlotTableWidgetCheckboxClicked)
+        self.plotTableWidgetCheckbox.setVisible(False)
+        self.plotTableWidgetLayout = QVBoxLayout()
+        self.plotTableWidgetLayout.addWidget(self.plotTableWidgetCheckbox)
+        self.plotTableWidgetLayout.setAlignment(Qt.AlignCenter)
+        self.plotTableWidgetLayout.setContentsMargins(0, 0, 0, 0)
+        self.plotTableWidget = QWidget(parent)
+        self.plotTableWidget.setLayout(self.plotTableWidgetLayout)
 
-    def rdOnlyTableItem(self):
-        tableItem = QTableWidgetItem(str(self.rdOnly))
-        tableItem.setTextAlignment(Qt.AlignCenter)
-        return tableItem
+        self.plotColorTableWidgetButton = QPushButton()
+        self.plotColorTableWidgetButton.clicked.connect(self.onPlotColorTableWidgetButtonClicked)
+        self.plotColorTableWidgetButton.setVisible(False)
+        self.plotColorTableWidgetButton.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.plotColorTableWidgetLayout = QVBoxLayout()
+        self.plotColorTableWidgetLayout.addWidget(self.plotColorTableWidgetButton)
+        utils.setButtonColor(self.plotColorTableWidgetButton, self.plotColor)
+        self.plotColorTableWidget = QWidget(parent)
+        self.plotColorTableWidget.setLayout(self.plotColorTableWidgetLayout)
 
-    def plotTableWidget(self):
-        layout = QVBoxLayout()
-        checkbox = QCheckBox()
-        if self.varType != 'float' and self.varType != 'int':
-            checkbox.setEnabled(False)
-            checkbox.setVisible(False)
-        layout.addWidget(checkbox)
-        layout.setAlignment(Qt.AlignCenter)
-        layout.setContentsMargins(0, 0, 0, 0)
-        tableWidget = QWidget()
-        tableWidget.setLayout(layout)
-        return (tableWidget, checkbox.stateChanged)
+        self.descTableItem = QTableWidgetItem(self.desc)
+        self.descTableItem.setTextAlignment(Qt.AlignCenter)
 
-    def plotColorTableWidget(self):
-        global nextColor
+    @pyqtSlot(bool)
+    def onPlotTableWidgetCheckboxClicked(self, state):
+        self.plotClicked.emit(self.name, state)
 
-        if self.varType == 'float' or self.varType == 'int':
-            layout = QVBoxLayout()
-            button = QPushButton()
-            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            palette = button.palette()
-            palette.setColor(QPalette.Button, self.Colors[nextColor])
-            button.setPalette(palette)
-            nextColor = (nextColor + 1) % len(self.Colors)
+    @pyqtSlot(bool)
+    def onPlotColorTableWidgetButtonClicked(self, state):
+        color = QColorDialog.getColor()
+        if color.isValid():
+            palette = self.plotColorTableWidgetButton.palette()
+            palette.setColor(QPalette.Button, color)
+            self.plotColorTableWidgetButton.setPalette(palette)
+            self.plotColorChanged.emit(self.name, color)
 
-            def onButtonClicked(clicked):
-                color = QColorDialog.getColor()
-                palette = onButtonClicked.button.palette()
-                if color.isValid():
-                    palette.setColor(QPalette.Button, color)
-                    onButtonClicked.button.setPalette(palette)
-                    onButtonClicked.signal.emit(color)
-            onButtonClicked.button = button
-            onButtonClicked.signal = self.colorChanged
+    def setName(self, name):
+        self.nameTableItem.setText(name)
+        self.name = name
 
-            button.clicked.connect(onButtonClicked)
-            layout.addWidget(button)
-            layout.setAlignment(Qt.AlignCenter)
-            layout.setContentsMargins(3, 3, 3, 3)
-            tableWidget = QWidget()
-            tableWidget.setLayout(layout)
-        else:
-            tableWidget = QWidget()
-        return (tableWidget, self.colorChanged)
+    def setRow(self, row):
+        self.row = row
 
-    def descTableItem(self):
-        tableItem = QTableWidgetItem(self.desc)
-        tableItem.setTextAlignment(Qt.AlignCenter)
-        return tableItem
+    def setValueStr(self, valueStr):
+        self.valueTableItem.setText(valueStr)
+        self.valueStr = valueStr
+
+    def setVarType(self, varType):
+        self.varTypeTableItem.setText(varType)
+        self.varType = varType
+        visibility = (varType == 'float' or varType == 'int')
+        self.plotTableWidgetCheckbox.setVisible(visibility)
+        self.plotColorTableWidgetButton.setVisible(visibility)
+
+    def setRdOnly(self, rdOnly):
+        self.rdOnlyTableItem.setText(str(rdOnly))
+        self.rdOnly = rdOnly
+
+    def setPlot(self, plot):
+        self.plotTableWidgetCheckbox.setChecked(plot)
+        self.plot = plot
+
+    def setPlotColor(self, plotColor):
+        utils.setButtonColor(self.plotColorTableWidgetButton, plotColor)
+        self.plotColor = plotColor
+
+    def setDesc(self, desc):
+        self.descTableItem.setText(desc)
+        self.desc = desc
+
+    def getName(self):
+        return self.name
+
+    def getRow(self):
+        return self.row
+
+    def getValueStr(self):
+        return self.valueStr
+
+    def getVarType(self):
+        return self.varType
+
+    def getRdOnly(self):
+        return self.rdOnly
+
+    def getPlot(self):
+        return self.plot
+
+    def getPlotColor(self):
+        return self.plotColor
+
+    def getDesc(self):
+        return self.desc
+
+    def getNameTableItem(self):
+        return self.nameTableItem
+
+    def getValueTableItem(self):
+        return self.valueTableItem
+
+    def getVarTypeTableItem(self):
+        return self.varTypeTableItem
+
+    def getRdOnlyTableItem(self):
+        return self.rdOnlyTableItem
+
+    def getPlotTableWidget(self):
+        return self.plotTableWidget
+
+    def getPlotColorTableWidget(self):
+        return self.plotColorTableWidget
+
+    def getDescTableItem(self):
+        return self.descTableItem
