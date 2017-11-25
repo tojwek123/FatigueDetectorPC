@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtCore import QCoreApplication, pyqtSlot
+from PyQt5.QtCore import QCoreApplication, pyqtSlot, QTimer
 from PyQt5.QtNetwork import QTcpServer, QTcpSocket, QHostAddress, QAbstractSocket
 import cv2
 import numpy as np
@@ -21,11 +21,21 @@ class MainApp(QCoreApplication):
         self.headerTokens = []
 
         self.variables = {
-            'EAR' : (0.0, 'float', True),
-            'EARLimit' : (5.0, 'float', False),
-            'FatigueDetected' : (False, 'bool', True),
-            'FPS' : (10.5, 'float', True)
+            'EAR' : [0.0, 'float', True],
+            'EARLimit' : [5.0, 'float', False],
+            'FatigueDetected' : [False, 'bool', True],
+            'FPS' : [10.5, 'float', True]
         }
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.onTimerTimeout)
+        self.timer.start(100)
+
+    @pyqtSlot()
+    def onTimerTimeout(self):
+        self.variables['EAR'][0] += 0.01
+        if self.variables['EAR'][0] >= 1.0:
+            self.variables['EAR'][0] = 0.0
 
     @pyqtSlot()
     def onNewConnection(self):
@@ -72,7 +82,11 @@ class MainApp(QCoreApplication):
         elif 'reqVarVal' == headerTokens[0]:
             varName = str(headerTokens[1], 'utf-8')
             if varName in self.variables:
-                self.send('varVal|' + varName, str(self.variables[varName][0]))
+                if self.variables[varName][1] == 'float':
+                    varStr = '%.2f' % self.variables[varName][0]
+                else:
+                    varStr = str(self.variables[varName][0])
+                self.send('varVal|' + varName, varStr)
         elif 'reqCamFrame' == headerTokens[0]:
             ret, frame = self.cap.read()
             data = cv2.imencode('.jpg', frame)[1]

@@ -21,7 +21,7 @@ class Variable(QObject):
         self.valueStr = ''
         self.varType = ''
         self.rdOnly = False
-        self.plot = False
+        self.plot = True
         self.plotColor = self.Colors[nextColor]
         self.desc = desc
 
@@ -39,6 +39,7 @@ class Variable(QObject):
         self.plotTableWidgetCheckbox = QCheckBox()
         self.plotTableWidgetCheckbox.clicked.connect(self.onPlotTableWidgetCheckboxClicked)
         self.plotTableWidgetCheckbox.setVisible(False)
+        self.plotTableWidgetCheckbox.setChecked(self.plot)
         self.plotTableWidgetLayout = QVBoxLayout()
         self.plotTableWidgetLayout.addWidget(self.plotTableWidgetCheckbox)
         self.plotTableWidgetLayout.setAlignment(Qt.AlignCenter)

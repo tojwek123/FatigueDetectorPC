@@ -8,6 +8,7 @@ import numpy as np
 import cv2
 import utils
 from remoteDataExchangerClient import RemoteDataExchangerClient
+from varPlot import VarPlot
 from variable import Variable
 
 
@@ -17,7 +18,9 @@ class MainWindow(QMainWindow):
     WaitingAnimationFrameDurationMs = 100
     ConnectionTimeoutMs = 5000
     DataReadTimerTimeoutMs = 100
+    ReplotTimerTimeoutMs = 100
     VideoStreamResolution = QSize(640, 480)
+    VarPlotSamplesNo = 300
     VariablesToRead = ['EAR', 'EARLimit', 'FatigueDetected', 'FPS']
     VarTableColumns = ['Name', 'Value', 'Type', 'Read-only', 'Plot', 'Plot color', 'Description']
     VarTableColumnsNo = {'Name': 0, 'Value': 1, 'Type': 2, 'Read-only': 3, 'Plot': 4, 'Plot color' : 5, 'Description': 6}
@@ -29,7 +32,6 @@ class MainWindow(QMainWindow):
         QSettings.setPath(QSettings.IniFormat, QSettings.UserScope, QDir.currentPath())
         self.settings = QSettings(QSettings.IniFormat, QSettings.UserScope, 'config')
         self.readSettings()
-
         self.targetDisconnectClicked = False
         self.connectionSettings = ConnectionSettings(self.targetAddr, self.targetPort, self)
         self.connectionSettings.settingsChanged.connect(self.onConnectionSettingsSettingsChanged)
@@ -45,13 +47,12 @@ class MainWindow(QMainWindow):
         self.dataReadTimer = QTimer(self)
         self.dataReadTimer.timeout.connect(self.onDataReadTimerTimeout)
         self.variables = {}
+        self.replotTimer = QTimer(self)
+        self.replotTimer.timeout.connect(self.onReplotTimerTimeout)
         self.initUI()
         self.onConnectionSettingsSettingsChanged(self.targetAddr, self.targetPort)
 
     def initUI(self):
-
-        pg.setConfigOption('background', 'w')
-        pg.setConfigOption('foreground', 'k')
         self.setWindowTitle('Diag Tool')
         self.statusBar = QStatusBar(self)
         self.targetInfo = QLabel(self)
@@ -59,6 +60,7 @@ class MainWindow(QMainWindow):
         self.statusBar.addWidget(self.targetInfo, 0)
         self.statusBar.addWidget(self.connectionStatus, 1)
         self.setStatusBar(self.statusBar)
+        self.varPlot = VarPlot(self.VarPlotSamplesNo, self.ReplotTimerTimeoutMs, self)
         self.varTableLabel = QLabel('Variables:', self)
         self.varTable = QTableWidget(self)
         self.varTable.horizontalHeader().setStretchLastSection(True)
@@ -67,6 +69,8 @@ class MainWindow(QMainWindow):
         self.varTable.setVisible(False)
         for varName in self.VariablesToRead:
             var = Variable(varName, len(self.variables), '', self)
+            var.plotClicked.connect(self.varPlot.setPlotVisible)
+            var.plotColorChanged.connect(self.varPlot.setPlotColor)
             self.variables.update({varName: var})
             self.varTable.setRowCount(var.getRow() + 1)
             self.varTable.setItem(var.getRow(), self.VarTableColumnsNo['Name'], var.getNameTableItem())
@@ -78,10 +82,9 @@ class MainWindow(QMainWindow):
             self.varTable.setItem(var.getRow(), self.VarTableColumnsNo['Description'], var.getDescTableItem())
         self.varTableNotAvailableLabel = QLabel('Variables not available')
         self.varTableNotAvailableLabel.setAlignment(Qt.AlignCenter)
-        self.varTableNotAvailableLabel.setMinimumWidth(400)
+        self.varTableNotAvailableLabel.setMinimumWidth(300)
+        self.resize(1400, 800)
         self.varTableNotAvailableLabel.setStyleSheet('border: 1px solid #BEBEBE; background-color: white')
-        self.varPlot = pg.PlotWidget(self)
-        self.varPlot.setEnabled(False)
         self.console = QTextEdit(self)
         self.console.setTextColor(QColor('white'))
         self.console.setStyleSheet('background-color: black;')
@@ -95,8 +98,6 @@ class MainWindow(QMainWindow):
         self.camFrameView.setStyleSheet('border: 1px solid #BEBEBE; background-color: white')
         self.camFrameView.setAlignment(Qt.AlignCenter)
         self.camFrameView.setText('Camera stream not available')
-        self.testButton = QPushButton('test', self)
-        self.testButton.clicked.connect(self.onTestButtonClicked)
 
         layout = QGridLayout(self)
         layout.setContentsMargins(3, 3, 3, 3)
@@ -107,13 +108,14 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.varTableNotAvailableLabel, 1, 0)
         layout.addWidget(self.camFrameView, 1, 1)
         layout.addWidget(self.tabWidget, 2, 0, 1, 2)
-        layout.addWidget(self.testButton, 3, 0)
         self.setCentralWidget(QWidget(self))
         self.centralWidget().setLayout(layout)
         self.menuTarget = self.menuBar().addMenu('Target')
         self.menuTargetConnect = QAction('Connect', self)
+        self.menuTargetConnect.setShortcut('Ctrl+R')
         self.menuTargetConnect.triggered.connect(self.onMenuTargetConnect)
         self.menuTargetSettings = QAction('Settings', self)
+        self.menuTargetSettings.setShortcut('Ctrl+E')
         self.menuTargetSettings.triggered.connect(self.onMenuTargetSettings)
         self.menuTarget.addAction(self.menuTargetConnect)
         self.menuTarget.addAction(self.menuTargetSettings)
@@ -121,16 +123,22 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.writeSettings()
 
-    @pyqtSlot(bool)
-    def onTestButtonClicked(self, clicked):
-        print('testButton')
-        #self.target.requestCamFrame()
+    @pyqtSlot()
+    def onReplotTimerTimeout(self):
+        for varName in self.variables:
+            if varName in self.varPlot:
+                self.varPlot.appendValue(varName, float(self.variables[varName].getValueStr()))
+        self.varPlot.replot()
 
     @pyqtSlot(str, str, bool)
     def onTargetVariableTypeRead(self, varName, varTypeStr, varRdOnly):
         if varName in self.variables:
             self.variables[varName].setVarType(varTypeStr)
             self.variables[varName].setRdOnly(varRdOnly)
+
+            if varTypeStr == 'float' or varTypeStr == 'int':
+                if varName not in self.varPlot:
+                    self.varPlot.addVariable(varName, self.variables[varName].getPlotColor(), self.variables[varName].getPlot())
 
     @pyqtSlot(str, str)
     def onTargetVariableValueRead(self, varName, varValueStr):
@@ -169,6 +177,7 @@ class MainWindow(QMainWindow):
         elif RemoteDataExchangerClient.StateConnected == self.target.state():
             self.targetDisconnectClicked = True
             self.dataReadTimer.stop()
+            self.replotTimer.stop()
             self.menuTargetConnect.setEnabled(False)
             self.target.disconnect()
 
@@ -197,6 +206,7 @@ class MainWindow(QMainWindow):
             elif not self.targetDisconnectClicked:
                 QMessageBox.warning(self, 'Warning', 'Connection has been lost.')
             self.targetDisconnectClicked = False
+            self.varPlot.clearData()
         elif RemoteDataExchangerClient.StateConnected == state:
             self.animationTimer.stop()
             self.menuTargetConnect.setText('Disconnect')
@@ -204,6 +214,7 @@ class MainWindow(QMainWindow):
             self.connectionStatus.setText('Online')
             self.dataReadTimer.timeout.emit()
             self.dataReadTimer.start(self.DataReadTimerTimeoutMs)
+            self.replotTimer.start(self.ReplotTimerTimeoutMs)
             self.varTable.setVisible(True)
             self.varTableNotAvailableLabel.setVisible(False)
 
