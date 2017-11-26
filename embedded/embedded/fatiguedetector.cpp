@@ -14,11 +14,9 @@ bool FatigueDetector::loadDataFiles()
     return success;
 }
 
-bool FatigueDetector::openCamera(int index)
+bool FatigueDetector::openCamera()
 {
-    m_cap.open(index);
-    bool success = m_cap.isOpened();
-
+    bool success = m_grabber.open();
     emit cameraOpened(success);
     return success;
 }
@@ -26,8 +24,10 @@ bool FatigueDetector::openCamera(int index)
 void FatigueDetector::detect()
 {
     cv::Mat frame;
-    m_cap >> frame;
+    m_grabber.grab();
+    m_grabber.retrieve(frame);
 
+    cv::pyrDown(frame, frame);
     cv::pyrDown(frame, frame);
     cv::pyrDown(frame, frame);
     auto faces = m_faceDetector.detect(frame);

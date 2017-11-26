@@ -8,6 +8,7 @@
 #include "config.h"
 #include "facedetector.h"
 #include "facelandmark68.h"
+#include "videograbber.h"
 #include "utils.h"
 
 struct FatigueDetectorStat;
@@ -17,7 +18,7 @@ class FatigueDetector : public QObject
     Q_OBJECT
 private:
     FaceDetector m_faceDetector;
-    cv::VideoCapture m_cap;
+    VideoGrabber m_grabber;
     Utils::MovAvgDbl m_movAvg;
 
     double calcEAR(const QVector<cv::Point> &eye);
@@ -31,7 +32,7 @@ signals:
     void detected(bool success, FatigueDetectorStat stat);
 
 public slots:
-    bool openCamera(int index = 0);
+    bool openCamera();
     bool loadDataFiles();
     void detect();
 };

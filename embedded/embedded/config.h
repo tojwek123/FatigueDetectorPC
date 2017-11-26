@@ -20,4 +20,7 @@
     #define CFG_PREDICTOR_DATA_PATH             "/home/pi/FatigueDetector/shape_predictor_68_face_landmarks.dat"
 #endif
 
+/* === Camera config === */
+#define CFG_USE_RASPICAM
+
 #endif // CONFIG_H

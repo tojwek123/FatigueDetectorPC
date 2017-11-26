@@ -10,11 +10,12 @@ SOURCES += \
     face.cpp \
     utils.cpp \
     qcustomplot.cpp \
-    _main.cpp \
-    main.cpp \
     fatiguedetector.cpp \
     mainapplication.cpp \
-    testwindow.cpp
+    testwindow.cpp \
+    videograbber.cpp \
+    _main.cpp \
+    main.cpp
 
 win32:CONFIG(release, debug|release): LIBS += -LC:/Dev/OpenCV/opencv/build/x64/vc14/lib/ -lopencv_world320
 else:win32:CONFIG(debug, debug|release): LIBS += -LC:/Dev/OpenCV/opencv/build/x64/vc14/lib/ -lopencv_world320d
@@ -29,7 +30,12 @@ unix:LIBS += -lopencv_core \
              -lopencv_objdetect \
              -lopencv_contrib \
              -lopencv_legacy \
-             -lopencv_flann
+             -lopencv_flann \
+             -lraspicam \
+             -lraspicam_cv \
+             -lmmal \
+             -lmmal_core \
+             -lmmal_util
 
 win32:INCLUDEPATH += C:/Dev/OpenCV/opencv/build/include
 win32:DEPENDPATH += C:/Dev/OpenCV/opencv/build/include
@@ -41,8 +47,11 @@ else:win32:!win32-g++:CONFIG(debug, debug|release): PRE_TARGETDEPS += C:/Dev/Ope
 
 INCLUDEPATH += C:/Dev/dlib-19.7
 
+#Won't work with '/usr/local/include/raspicam'
+unix:INCLUDEPATH += C:/SysGCC/Raspberry/arm-linux-gnueabihf/sysroot/usr/local/include/
+
 HEADERS += \
-		facedetector.h \
+            facedetector.h \
 	    face.h \
 	    facelandmark68.h \
 	    utils.h \
@@ -50,7 +59,8 @@ HEADERS += \
 	    fatiguedetector.h \
 	    mainapplication.h \
 	    testwindow.h \
-	    config.h
+            config.h \
+    videograbber.h
 
 unix:target.path = /home/pi/FatigueDetector
 unix:INSTALLS += target

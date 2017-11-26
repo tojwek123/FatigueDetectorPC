@@ -107,11 +107,12 @@ class VarPlot(pg.PlotWidget):
 
         self.setYRange(minValue, maxValue, 0)
 
-        if (max(self.dataLen.values())) > self.samplesNo:
-            for i in range(len(self.ticksVal)):
-               self.ticksVal[i] += self.updateRateMs / 1000
-               self.ticksStr[i] = (self.ticksStr[i][0], '{:.1f}s'.format(self.ticksVal[i]))
-            self.getAxis('bottom').setTicks([self.ticksStr])
+        if len(self.dataLen) > 0:
+            if (max(self.dataLen.values())) > self.samplesNo:
+                for i in range(len(self.ticksVal)):
+                   self.ticksVal[i] += self.updateRateMs / 1000
+                   self.ticksStr[i] = (self.ticksStr[i][0], '{:.1f}s'.format(self.ticksVal[i]))
+                self.getAxis('bottom').setTicks([self.ticksStr])
 
     @pyqtSlot(str, bool)
     def setPlotVisible(self, varName, visible):
