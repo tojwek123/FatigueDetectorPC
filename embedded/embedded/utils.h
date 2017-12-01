@@ -3,6 +3,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <cmath>
+#include <ctime>
 #include <QVector>
 #include <dlib/geometry/rectangle.h>
 
@@ -13,6 +14,10 @@
 namespace Utils
 {
     class MovAvgDbl;
+    static clock_t Tic;
+
+    inline void tic() { Tic = clock(); }
+    inline clock_t toc() { return (clock() - Tic) * 1000 / CLOCKS_PER_SEC; }
 
     double euclDist(const cv::Point &a, const cv::Point &b);
 

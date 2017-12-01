@@ -10,7 +10,7 @@ bool VideoGrabber::open()
 #ifdef CFG_USE_RASPICAM
     return this->m_grabber.open();
 #else
-    return this->grabber.open(0);
+    return this->m_grabber.open(0);
 #endif
 }
 

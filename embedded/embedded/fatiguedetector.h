@@ -30,10 +30,12 @@ signals:
     void predictorDataLoaded(bool success);
     void cameraOpened(bool success);
     void detected(bool success, FatigueDetectorStat stat);
+    void newFrame(cv::Mat frame);
 
 public slots:
     bool openCamera();
-    bool loadDataFiles();
+    bool loadDataFiles(const QString cascadeClassifierDataPath,
+                       const QString predictorDataPath);
     void detect();
 };
 

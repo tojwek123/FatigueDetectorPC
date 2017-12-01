@@ -21,7 +21,7 @@ class Variable(QObject):
         self.valueStr = ''
         self.varType = ''
         self.rdOnly = False
-        self.plot = True
+        self.plot = False
         self.plotColor = self.Colors[nextColor]
         self.desc = desc
 

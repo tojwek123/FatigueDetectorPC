@@ -7,10 +7,10 @@ import math
 
 class VarPlot(pg.PlotWidget):
 
-    PlotPenWidth = 0.1
-    TicksNo = 12
+    PlotPenWidth = 0.01
+    TicksNo = 20
 
-    def __init__(self, samplesNo=1000, updateRateMs=100, parent=None):
+    def __init__(self, samplesNo, updateRateMs, parent=None):
         pg.setConfigOption('background', 'w')
         pg.setConfigOption('foreground', 'k')
         pg.setConfigOptions(antialias=True)
@@ -35,9 +35,11 @@ class VarPlot(pg.PlotWidget):
         self.plotVisible = {}
         self.plotPen = {}
 
-
     def __contains__(self, key):
         return key in self.data
+
+    def setUpdateRateMs(self, updateRateMs):
+        self.updateRateMs = updateRateMs
 
     def resetTicks(self):
         self.ticksStr = []
@@ -71,6 +73,13 @@ class VarPlot(pg.PlotWidget):
         self.resetTicks()
         self.replot()
 
+    def updateXScale(self):
+        if len(self.dataLen) > 0:
+            if (max(self.dataLen.values())) > self.samplesNo:
+                for i in range(len(self.ticksVal)):
+                    self.ticksVal[i] += self.updateRateMs / 1000
+                    self.ticksStr[i] = (self.ticksStr[i][0], '{:.1f}s'.format(self.ticksVal[i]))
+
     def replot(self):
         extremumFound = False
 
@@ -99,20 +108,14 @@ class VarPlot(pg.PlotWidget):
         else:
             minValue = math.floor(minValue)
             if minValue % 2 != 0:
-                minValue -= 1
+                pass#minValue -= 1
 
             maxValue = math.ceil(maxValue)
             if maxValue % 2 != 0:
-                maxValue += 1
+                pass#maxValue += 1
 
         self.setYRange(minValue, maxValue, 0)
-
-        if len(self.dataLen) > 0:
-            if (max(self.dataLen.values())) > self.samplesNo:
-                for i in range(len(self.ticksVal)):
-                   self.ticksVal[i] += self.updateRateMs / 1000
-                   self.ticksStr[i] = (self.ticksStr[i][0], '{:.1f}s'.format(self.ticksVal[i]))
-                self.getAxis('bottom').setTicks([self.ticksStr])
+        self.getAxis('bottom').setTicks([self.ticksStr])
 
     @pyqtSlot(str, bool)
     def setPlotVisible(self, varName, visible):

@@ -2,7 +2,7 @@ TEMPLATE = app
 CONFIG += console c++11
 CONFIG -= app_bundle
 
-QT += core gui printsupport
+QT += core gui printsupport network
 
 SOURCES += \
     facedetector.cpp \
@@ -12,10 +12,11 @@ SOURCES += \
     qcustomplot.cpp \
     fatiguedetector.cpp \
     mainapplication.cpp \
-    testwindow.cpp \
     videograbber.cpp \
     _main.cpp \
-    main.cpp
+    main.cpp \
+    remotedataexchangerserver.cpp \
+    settings.cpp
 
 win32:CONFIG(release, debug|release): LIBS += -LC:/Dev/OpenCV/opencv/build/x64/vc14/lib/ -lopencv_world320
 else:win32:CONFIG(debug, debug|release): LIBS += -LC:/Dev/OpenCV/opencv/build/x64/vc14/lib/ -lopencv_world320d
@@ -58,9 +59,11 @@ HEADERS += \
 	    qcustomplot.h \
 	    fatiguedetector.h \
 	    mainapplication.h \
-	    testwindow.h \
             config.h \
-    videograbber.h
+    videograbber.h \
+    remotedataexchangerserver.h \
+    variable.h \
+    settings.h
 
 unix:target.path = /home/pi/FatigueDetector
 unix:INSTALLS += target

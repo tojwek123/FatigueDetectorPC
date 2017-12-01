@@ -7,10 +7,12 @@ import cv2
 class RemoteDataExchangerClient(QObject):
 
     stateChanged = pyqtSignal(int)
-    variableTypeRead = pyqtSignal(str, str, bool)
-    variableValueRead = pyqtSignal(str, str)
+    varInfoRead = pyqtSignal(list)
+    varValueRead = pyqtSignal(list)
     camFrameRead = pyqtSignal(np.ndarray)
 
+    TokenSeparator = ' '
+    VarTokenSeparator = ','
     StateDisconnected = 0
     StateConnecting = 1
     StateConnected = 2
@@ -52,7 +54,7 @@ class RemoteDataExchangerClient(QObject):
             if self.readHeader:
                 if self.socket.canReadLine():
                     line = self.socket.readLine()
-                    self.headerTokens = line.split('|')
+                    self.headerTokens = line.split(self.TokenSeparator)
                     self.dataBytesToRead = int(self.headerTokens[-1])
                     self.readHeader = False
                 else:
@@ -71,43 +73,59 @@ class RemoteDataExchangerClient(QObject):
 
     def parseMessage(self, headerTokens, data):
         if len(headerTokens) > 0:
-            if 'varType' == headerTokens[0]:
-                if len(headerTokens) > 1:
-                    name = str(headerTokens[1], 'utf-8')
-                    dataTokens = str(data, 'utf-8').split('|')
-                    if len(dataTokens) > 1:
-                        varType = dataTokens[0]
-                        varAccess = dataTokens[1]
-                        if 'r' == varAccess:
-                            rdOnly = True
-                        elif 'rw' == varAccess:
-                            rdOnly = False
-                        else:
-                            return
-                        self.variableTypeRead.emit(name, varType, rdOnly)
-            elif 'varVal' == headerTokens[0]:
-                if len(headerTokens) > 1:
-                    name = str(headerTokens[1], 'utf-8')
-                    value = str(data, 'utf-8')
-                    self.variableValueRead.emit(name, value)
-            elif 'camFrame' == headerTokens[0]:
+            if 'varInfo' == headerTokens[0]:
+                varInfo = []
+                dataTokens = data.decode().split(self.TokenSeparator)
+
+                for token in dataTokens:
+                    varTokens = token.split(self.VarTokenSeparator)
+
+                    if len(varTokens) >= 4:
+                        name = varTokens[0];
+                        type = varTokens[1]
+                        readOnly = (varTokens[2] == 'r')
+                        valStr = varTokens[3]
+                        varInfo.append({'name': name, 'type': type, 'readOnly': readOnly, 'valStr': valStr})
+
+                self.varInfoRead.emit(varInfo)
+            elif 'varStreamValue' == headerTokens[0]:
+                varValue = []
+                dataTokens = data.decode().split(self.TokenSeparator)
+
+                for token in dataTokens:
+                    varTokens = token.split(self.VarTokenSeparator)
+
+                    if len(varTokens) >= 2:
+                        name = varTokens[0];
+                        valStr = varTokens[1];
+                        varValue.append({'name': name, 'valStr': valStr})
+
+                self.varValueRead.emit(varValue);
+
+            elif 'videoStreamFrame' == headerTokens[0]:
                 arr = np.frombuffer(data, dtype=np.uint8)
                 cvIm = cv2.imdecode(arr, cv2.IMREAD_COLOR)
                 self.camFrameRead.emit(cvIm)
 
     def send(self, header, data=''):
-        header = header + '|' + str(len(data)) + '\n'
+        header = header + self.TokenSeparator + str(len(data)) + '\n'
         self.socket.writeData(header.encode())
         self.socket.writeData(data.encode())
 
-    def requestVariable(self, varName):
-        self.send('reqVarVal|' + varName)
+    def startVarStream(self):
+        self.send('startVarStream')
+        
+    def stopVarStream(self):
+        self.send('stopVarStream')
 
-    def requestVariableType(self, varName):
-        self.send('reqVarType|' + varName)
+    def requestVarInfo(self):
+        self.send('reqVarInfo')
 
-    def requestCamFrame(self):
-        self.send('reqCamFrame')
+    def startVideoStream(self):
+        self.send('startVideoStream')
+
+    def stopVideoStream(self):
+        self.send('stopVideoStream')
 
     def connect(self, addr, port, timeoutMs=5000):
         if QAbstractSocket.UnconnectedState == self.socket.state():

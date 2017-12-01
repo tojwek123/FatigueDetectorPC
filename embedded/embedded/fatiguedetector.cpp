@@ -7,9 +7,10 @@ FatigueDetector::FatigueDetector(QObject *parent) :
 
 }
 
-bool FatigueDetector::loadDataFiles()
+bool FatigueDetector::loadDataFiles(const QString cascadeClassifierDataPath,
+                                    const QString predictorDataPath)
 {
-    bool success = m_faceDetector.loadDataFiles();
+    bool success = m_faceDetector.loadDataFiles(cascadeClassifierDataPath, predictorDataPath);
     emit predictorDataLoaded(success);
     return success;
 }
@@ -27,9 +28,6 @@ void FatigueDetector::detect()
     m_grabber.grab();
     m_grabber.retrieve(frame);
 
-    cv::pyrDown(frame, frame);
-    cv::pyrDown(frame, frame);
-    cv::pyrDown(frame, frame);
     auto faces = m_faceDetector.detect(frame);
 
     FatigueDetectorStat stat;
@@ -49,17 +47,13 @@ void FatigueDetector::detect()
         cv::putText(frame, strEAR, cv::Point(5, 15), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 255), 1);
         Utils::drawPoly(frame, leftEye, cv::Scalar(255, 0, 0), 1);
         Utils::drawPoly(frame, rightEye, cv::Scalar(255, 0, 0), 1);
-
         success = true;
         stat.rawEAR = rawEAR;
         stat.avgEAR = EAR;
         break;
     }
 
-#ifdef CFG_APP_TYPE_GUI
-    cv::imshow("Frame", frame);
-    cv::waitKey(1);
-#endif
+    emit newFrame(frame);
     emit detected(success, stat);
 }
 
