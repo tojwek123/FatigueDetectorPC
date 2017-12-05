@@ -12,26 +12,32 @@ MainApplication::MainApplication(int &argc, char **argv) :
     /* Load settings from file */
     m_settings.loadFromFile();
 
+    m_fatigueDetectorParams.avgEARLimit = m_settings.avgEARLimit();
+    m_fatigueDetectorParams.movAvgSize = m_settings.movAvgSize();
+    m_fatigueDetector = new FatigueDetector(m_fatigueDetectorParams);
+
     connect(&m_varStreamTimer, &QTimer::timeout,
             this, &MainApplication::onVarStreamTimerTimeout);
 
     /* Signals from FatigueDetector */
-    connect(&m_fatigueDetector, &FatigueDetector::predictorDataLoaded,
+    connect(m_fatigueDetector, &FatigueDetector::predictorDataLoaded,
             this, &MainApplication::onDetectorDataFilesLoaded);
-    connect(&m_fatigueDetector, &FatigueDetector::cameraOpened,
+    connect(m_fatigueDetector, &FatigueDetector::cameraOpened,
             this, &MainApplication::onCameraOpened);
-    connect(&m_fatigueDetector, &FatigueDetector::detected,
-            this, &MainApplication::onDetected);
-    connect(&m_fatigueDetector, &FatigueDetector::newFrame,
+    connect(m_fatigueDetector, &FatigueDetector::detectionFinished,
+            this, &MainApplication::onDetectionFinished);
+    connect(m_fatigueDetector, &FatigueDetector::newFrame,
             this, &MainApplication::onFatigueDetectorFrame);
 
     /* Signals to FatigueDetector*/
     connect(this, &MainApplication::loadDetectorDataFiles,
-            &m_fatigueDetector, &FatigueDetector::loadDataFiles);
+            m_fatigueDetector, &FatigueDetector::loadDataFiles);
     connect(this, &MainApplication::openCamera,
-            &m_fatigueDetector, &FatigueDetector::openCamera);
+            m_fatigueDetector, &FatigueDetector::openCamera);
     connect(this, &MainApplication::detect,
-            &m_fatigueDetector, &FatigueDetector::detect);
+            m_fatigueDetector, &FatigueDetector::detect);
+    connect(this, &MainApplication::setFatigueDetectorParams,
+            m_fatigueDetector, &FatigueDetector::setParams);
 
     /* Signals from RemoteDataExchanger */
     connect(&m_dataExchangerServer, &RemoteDataExchangerServer::clientStateChanged,
@@ -43,7 +49,7 @@ MainApplication::MainApplication(int &argc, char **argv) :
     m_perfTimer.start();
     m_dataExchangerServer.listen(m_settings.tcpPort());
 
-    m_fatigueDetector.moveToThread(&m_fatigueDetectorThread);
+    m_fatigueDetector->moveToThread(&m_fatigueDetectorThread);
     m_fatigueDetectorThread.start();
     m_logger << "Loading detector data files..." << endl;
     emit loadDetectorDataFiles(m_settings.cascadeClassifierDataPath(), m_settings.predictorDataPath());
@@ -51,33 +57,66 @@ MainApplication::MainApplication(int &argc, char **argv) :
     /* Init variables */
     Variable EAR;
     EAR.name = "EAR";
-    EAR.type = "float";
+    EAR.type = VarType::Float;
     EAR.readOnly = true;
     EAR.value = 0;
     m_variables.insert(EAR.name, EAR);
 
     Variable avgEAR;
     avgEAR.name = "avgEAR";
-    avgEAR.type = "float";
+    avgEAR.type = VarType::Float;
     avgEAR.readOnly = true;
     avgEAR.value = 0;
     m_variables.insert(avgEAR.name, avgEAR);
 
-//    for (int i = 0; i < 10; ++i)
-//    {
-//        Variable v;
-//        v.name = "var" + QString::number(i + 1);
-//        v.type = "float";
-//        v.readOnly = true;
-//        v.value = QVariant(fmod(qrand(), 10));
-//        m_variables.append(v);
-//    }
+    Variable avgEARLimit;
+    avgEARLimit.name = "avgEARLimit";
+    avgEARLimit.type = VarType::Float;
+    avgEARLimit.readOnly = false;
+    avgEARLimit.value = m_settings.avgEARLimit();
+    m_variables.insert(avgEARLimit.name, avgEARLimit);
+
+    Variable faceDetected;
+    faceDetected.name = "faceDetected";
+    faceDetected.type = VarType::Bool;
+    faceDetected.readOnly = true;
+    faceDetected.value = false;
+    m_variables.insert(faceDetected.name, faceDetected);
+
+    Variable fatigueDetected;
+    fatigueDetected.name = "fatigueDetected";
+    fatigueDetected.type = VarType::Bool;
+    fatigueDetected.readOnly = true;
+    fatigueDetected.value = false;
+    m_variables.insert(fatigueDetected.name, fatigueDetected);
+
+    Variable faceBoundingBox;
+    faceBoundingBox.name = "faceBoundingBox";
+    faceBoundingBox.type = VarType::IntList;
+    faceBoundingBox.readOnly = true;
+    faceBoundingBox.value = QVariant::fromValue(QList<int>());
+    m_variables.insert(faceBoundingBox.name, faceBoundingBox);
+
+    Variable leftEye;
+    leftEye.name = "leftEye";
+    leftEye.type = VarType::IntList;
+    leftEye.readOnly = true;
+    leftEye.value = QVariant::fromValue(QList<int>());
+    m_variables.insert(leftEye.name, leftEye);
+
+    Variable rightEye;
+    rightEye.name = "rightEye";
+    rightEye.type = VarType::IntList;
+    rightEye.readOnly = true;
+    rightEye.value = QVariant::fromValue(QList<int>());
+    m_variables.insert(rightEye.name, rightEye);
 }
 
 MainApplication::~MainApplication()
 {
     m_fatigueDetectorThread.quit();
     m_fatigueDetectorThread.wait();
+    delete m_fatigueDetector;
 }
 
 void MainApplication::onVarStreamTimerTimeout()
@@ -112,18 +151,35 @@ void MainApplication::onCameraOpened(bool success)
     }
 }
 
-void MainApplication::onDetected(bool success, FatigueDetectorStat stat)
+void MainApplication::onDetectionFinished(FatigueDetectorStat stat)
 {
-    if (success)
+    m_variables["EAR"].value = stat.EAR;
+    m_variables["avgEAR"].value = stat.avgEAR;
+    m_variables["faceDetected"].value = stat.faceDetected;
+    m_variables["fatigueDetected"].value = stat.fatigueDetected;
+
+    QList<int> boundingBoxList = {stat.boundingBox.x,
+                                  stat.boundingBox.y,
+                                  stat.boundingBox.x + stat.boundingBox.width,
+                                  stat.boundingBox.y + stat.boundingBox.height};
+    m_variables["faceBoundingBox"].value = QVariant::fromValue(boundingBoxList);
+
+    QList<int> leftEyeList;
+    for (auto i : stat.leftEye)
     {
-        m_variables["EAR"].value = stat.rawEAR;
-        m_variables["avgEAR"].value = stat.avgEAR;
+        leftEyeList.append(i.x);
+        leftEyeList.append(i.y);
     }
-    else
+    m_variables["leftEye"].value = QVariant::fromValue(leftEyeList);
+
+    QList<int> rightEyeList;
+    for (auto i : stat.rightEye)
     {
-        m_variables["EAR"].value = 0;
-        m_variables["avgEAR"].value = 0;
+        rightEyeList.append(i.x);
+        rightEyeList.append(i.y);
     }
+    m_variables["rightEye"].value = QVariant::fromValue(rightEyeList);
+
     emit detect();
 }
 
@@ -167,6 +223,16 @@ void MainApplication::onDataExchangerNewRequest(RemoteRequest request, QVector<Q
     case RemoteRequest::StopVideoStream:
         m_videoStreamOn = false;
         break;
+    case RemoteRequest::SetVarValue:
+        if (args.length() >= 2)
+        {
+            QString varName = args[0].toString();
+            if (m_variables.contains(varName))
+            {
+                m_variables[varName].value = args[1];
+                //Validation needed
+            }
+        }
     }
 }
 

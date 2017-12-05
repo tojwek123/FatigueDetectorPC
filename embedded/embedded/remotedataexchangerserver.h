@@ -5,9 +5,9 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QHostAddress>
+#include <QDebug>
 #include <opencv2/opencv.hpp>
 #include <vector>
-#include <iostream>
 #include "variable.h"
 #include "utils.h"
 #include "config.h"
@@ -17,7 +17,8 @@ enum class RemoteRequest {
     StartVarStream,
     StopVarStream,
     StartVideoStream,
-    StopVideoStream
+    StopVideoStream,
+    SetVarValue
 };
 
 class RemoteDataExchangerServer : public QObject
@@ -32,8 +33,11 @@ private:
     int m_dataBytesToRead;
 
     static const char TokenSeparator = ' ';
-    static const char VarTokenSeparator = ',';
+    static const char VarTokenSeparator = ';';
 
+    QVariant varStrToVariant(const QString &valueStr, const VarType &type);
+    QString varTypeToStr(const VarType &type);
+    QString valueToStr(const QVariant &value, const VarType &type);
     void parseMessage(const QStringList &headerTokens, const QByteArray &data);
     void send(const QStringList &headerTokens, const QByteArray &data);
     void send(const QStringList &headerTokens, const QStringList &dataTokens);

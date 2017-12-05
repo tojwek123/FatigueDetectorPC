@@ -8,7 +8,7 @@ nextColor = 0
 
 class Variable(QObject):
 
-    Colors = [Qt.blue, Qt.red, Qt.darkGreen, Qt.darkYellow, Qt.darkCyan]
+    Colors = [QColor(Qt.blue), QColor(Qt.red), QColor(Qt.darkGreen), QColor(Qt.darkYellow), QColor(Qt.darkCyan)]
     plotClicked = pyqtSignal(str, bool)
     plotColorChanged = pyqtSignal(str, QColor)
 
@@ -87,7 +87,7 @@ class Variable(QObject):
     def setVarType(self, varType):
         self.varTypeTableItem.setText(varType)
         self.varType = varType
-        visibility = (varType == 'float' or varType == 'int')
+        visibility = (varType == 'float' or varType == 'int' or varType == 'bool')
         self.plotTableWidgetCheckbox.setVisible(visibility)
         self.plotColorTableWidgetButton.setVisible(visibility)
 

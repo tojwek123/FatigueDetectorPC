@@ -13,7 +13,7 @@ class ConnectionSettings(QDialog):
 
     settingsChanged = pyqtSignal(str, int)
 
-    def __init__(self, initAddr, initPort, parent = None):
+    def __init__(self, initAddr, initPort, parent=None):
         super().__init__(parent)
         self.setWindowFlags(self.windowFlags() & (~QtCore.Qt.WindowContextHelpButtonHint))
 

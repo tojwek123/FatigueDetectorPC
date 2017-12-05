@@ -60,8 +60,68 @@ void RemoteDataExchangerServer::onClientReadyRead()
     }
 }
 
+QString RemoteDataExchangerServer::varTypeToStr(const VarType &type)
+{
+    switch (type)
+    {
+    case VarType::Bool:
+        return "bool";
+    case VarType::Float:
+        return "float";
+    case VarType::FloatList:
+        return "float[]";
+    case VarType::IntList:
+        return "int[]";
+    default:
+        return "<Unknown type>";
+    }
+}
+
+QString varValueToStr(const QVariant &value, const VarType &type)
+{
+    if (type == VarType::Float)
+    {
+        return QString::number(value.toDouble(), 'f', 3);
+    }
+    else if (type == VarType::FloatList)
+    {
+        QList<double> rawValue = value.value<QList<double>>();
+        QString retStr = "[";
+        for (int i = 0; i < rawValue.length(); ++i)
+        {
+            retStr += QString::number(rawValue[i], 'f', 3);
+            if (i < rawValue.length() - 1)
+            {
+                retStr += ",";
+            }
+        }
+        retStr += "]";
+        return retStr;
+    }
+    else if (type == VarType::IntList)
+    {
+        QList<int> rawValue = value.value<QList<int>>();
+        QString retStr = "[";
+        for (int i = 0; i < rawValue.length(); ++i)
+        {
+            retStr += QString::number(rawValue[i]);
+            if (i < rawValue.length() - 1)
+            {
+                retStr += ",";
+            }
+        }
+        retStr += "]";
+        return retStr;
+    }
+    else
+    {
+        return value.toString();
+    }
+}
+
 void RemoteDataExchangerServer::parseMessage(const QStringList &headerTokens, const QByteArray &data)
 {
+    (void)data;
     QVector<QVariant> args;
 
     if (headerTokens.length() > 0)
@@ -88,6 +148,18 @@ void RemoteDataExchangerServer::parseMessage(const QStringList &headerTokens, co
         else if ("stopVideoStream" == headerTokens[0])
         {
             emit newRequest(RemoteRequest::StopVideoStream, args);
+        }
+        else if ("setVarValue" == headerTokens[0])
+        {
+            auto varTokens = data.split(VarTokenSeparator);
+            for (auto i : varTokens)
+            {
+                args.append(QVariant(i));
+            }
+            if (args.length() >= 2)
+            {
+                emit newRequest(RemoteRequest::SetVarValue, args);
+            }
         }
     }
 }
@@ -127,16 +199,9 @@ void RemoteDataExchangerServer::respondVarInfo(const QMap<QString, Variable> &va
     {
         QString token;
         token += i.name + VarTokenSeparator;
-        token += i.type + VarTokenSeparator;
+        token += varTypeToStr(i.type) + VarTokenSeparator;
         token += (i.readOnly ? QString("r") : QString("rw")) + VarTokenSeparator;
-        if ("float" == i.type)
-        {
-            token += QString::number(i.value.toDouble(), 'f', 3);
-        }
-        else
-        {
-            token += i.value.toString();
-        }
+        token += varValueToStr(i.value, i.type);
         dataTokens.append(token);
     }
 
@@ -152,14 +217,7 @@ void RemoteDataExchangerServer::sendVarStreamValue(const QMap<QString, Variable>
     {
         QString token;
         token += i.name + VarTokenSeparator;
-        if ("float" == i.type)
-        {
-            token += QString::number(i.value.toDouble(), 'f', 3);
-        }
-        else
-        {
-            token += i.value.toString();
-        }
+        token += varValueToStr(i.value, i.type);
         dataTokens.append(token);
     }
 

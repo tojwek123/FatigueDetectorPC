@@ -6,6 +6,7 @@
 #include <QThread>
 #include <QTextStream>
 #include <QElapsedTimer>
+#include <QDebug>
 #include "config.h"
 #include "settings.h"
 #include "fatiguedetector.h"
@@ -16,7 +17,8 @@ class MainApplication : public QCoreApplication
     Q_OBJECT
 private:
     RemoteDataExchangerServer m_dataExchangerServer;
-    FatigueDetector m_fatigueDetector;
+    FatigueDetector *m_fatigueDetector;
+    FatigueDetectorParams m_fatigueDetectorParams;
     QThread m_fatigueDetectorThread;
     QTextStream m_logger;
     QElapsedTimer m_perfTimer;
@@ -37,12 +39,13 @@ signals:
                                const QString predictorDataPath);
     void openCamera(int index = 0);
     void detect();
+    void setFatigueDetectorParams(const FatigueDetectorParams);
 
 private slots:
     void onVarStreamTimerTimeout();
     void onDetectorDataFilesLoaded(bool success);
     void onCameraOpened(bool success);
-    void onDetected(bool success, FatigueDetectorStat stat);
+    void onDetectionFinished(FatigueDetectorStat stat);
     void onFatigueDetectorFrame(cv::Mat frame);
     void onDataExchangerClientStateChanged(bool connected);
     void onDataExchangerNewRequest(RemoteRequest request, QVector<QVariant> args);

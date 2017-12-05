@@ -8,11 +8,11 @@ class RemoteDataExchangerClient(QObject):
 
     stateChanged = pyqtSignal(int)
     varInfoRead = pyqtSignal(list)
-    varValueRead = pyqtSignal(list)
+    varValuesRead = pyqtSignal(list)
     camFrameRead = pyqtSignal(np.ndarray)
 
     TokenSeparator = ' '
-    VarTokenSeparator = ','
+    VarTokenSeparator = ';'
     StateDisconnected = 0
     StateConnecting = 1
     StateConnected = 2
@@ -100,7 +100,7 @@ class RemoteDataExchangerClient(QObject):
                         valStr = varTokens[1];
                         varValue.append({'name': name, 'valStr': valStr})
 
-                self.varValueRead.emit(varValue);
+                self.varValuesRead.emit(varValue);
 
             elif 'videoStreamFrame' == headerTokens[0]:
                 arr = np.frombuffer(data, dtype=np.uint8)
@@ -126,6 +126,9 @@ class RemoteDataExchangerClient(QObject):
 
     def stopVideoStream(self):
         self.send('stopVideoStream')
+
+    def setVarValue(self, varName, varValStr):
+        self.send('setVarValue', varName + self.VarTokenSeparator + varValStr)
 
     def connect(self, addr, port, timeoutMs=5000):
         if QAbstractSocket.UnconnectedState == self.socket.state():

@@ -7,7 +7,7 @@ import math
 
 class VarPlot(pg.PlotWidget):
 
-    PlotPenWidth = 0.01
+    PlotPenWidth = 2
     TicksNo = 20
 
     def __init__(self, samplesNo, updateRateMs, parent=None):
@@ -57,7 +57,7 @@ class VarPlot(pg.PlotWidget):
         self.dataLen.update({varName: 0})
         self.plotColor.update({varName: color})
         self.plotVisible.update({varName: visible})
-        self.plotPen.update({varName: QPen(color, self.PlotPenWidth)})
+        self.plotPen.update({varName: pg.mkPen(color.getRgb(), width=self.PlotPenWidth)})
 
     def appendValue(self, varName, varValue):
         if varName in self.data:
@@ -123,4 +123,4 @@ class VarPlot(pg.PlotWidget):
 
     @pyqtSlot(str, QColor)
     def setPlotColor(self, varName, color):
-        self.plotPen[varName] = QPen(color, self.PlotPenWidth)
+        self.plotPen[varName] = pg.mkPen(color.getRgb(), width=self.PlotPenWidth)

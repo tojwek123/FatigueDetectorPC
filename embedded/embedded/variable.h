@@ -4,11 +4,19 @@
 #include <QString>
 #include <QVariant>
 
+enum class VarType {
+    Bool,
+    Int,
+    Float,
+    IntList,
+    FloatList
+};
+
 struct Variable
 {
 public:
     QString name;
-    QString type;
+    VarType type;
     bool readOnly;
     QVariant value;
 };

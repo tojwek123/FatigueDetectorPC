@@ -10,10 +10,15 @@ import utils
 from remoteDataExchangerClient import RemoteDataExchangerClient
 from varPlot import VarPlot
 from variable import Variable
+from varValueChanger import VarValueChanger
 
 
 class MainWindow(QMainWindow):
 
+    BoundingBoxColor = (255, 0, 0)
+    BoundingBoxWidth = 1
+    EyesContourColor = (0, 0, 255)
+    EyesContourWidth = 1
     WaitingAnimation = [' |', ' /', ' -', ' \\']
     WaitingAnimationFrameDurationMs = 100
     ConnectionTimeoutMs = 5000
@@ -32,14 +37,19 @@ class MainWindow(QMainWindow):
         self.targetPort = 0
         QSettings.setPath(QSettings.IniFormat, QSettings.UserScope, QDir.currentPath())
         self.settings = QSettings(QSettings.IniFormat, QSettings.UserScope, 'config')
-        self.readSettings()
+        value = self.settings.value('target/addr')
+        if value:
+            self.targetAddr = str(value)
+        value = self.settings.value('target/port')
+        if value:
+            self.targetPort = int(value)
         self.targetDisconnectClicked = False
         self.connectionSettings = ConnectionSettings(self.targetAddr, self.targetPort, self)
         self.connectionSettings.settingsChanged.connect(self.onConnectionSettingsSettingsChanged)
         self.target = RemoteDataExchangerClient(self)
         self.target.stateChanged.connect(self.onTargetStateChanged)
         self.target.varInfoRead.connect(self.onTargetVarInfoRead)
-        self.target.varValueRead.connect(self.onTargetVarValueRead)
+        self.target.varValuesRead.connect(self.onTargetVarValuesRead)
         self.target.camFrameRead.connect(self.onTargetCamFrameRead)
         self.lastTargetState = RemoteDataExchangerClient.StateDisconnected
         self.animationTimer = QTimer(self)
@@ -48,7 +58,7 @@ class MainWindow(QMainWindow):
         self.variables = {}
         self.initUI()
         self.onConnectionSettingsSettingsChanged(self.targetAddr, self.targetPort)
-        self.replotCnt = 0;
+        self.replotCnt = 0
 
     def initUI(self):
         self.setWindowTitle('Diag Tool')
@@ -63,11 +73,13 @@ class MainWindow(QMainWindow):
         self.varPlot.setStyleSheet('border: 1px solid #BEBEBE; background-color: white')
         self.varTableLabel = QLabel('Variables:', self)
         self.varTable = QTableWidget(self)
+        self.varTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.varTable.setFixedHeight(self.VideoStreamResolution.height())
         self.varTable.horizontalHeader().setStretchLastSection(True)
         self.varTable.setColumnCount(len(self.VarTableColumnsNo))
         self.varTable.setHorizontalHeaderLabels(self.VarTableColumns)
         self.varTable.setVisible(False)
+        self.varTable.doubleClicked.connect(self.onVarTableDoubleClicked)
         self.varTableNotAvailableLabel = QLabel('Variables not available')
         self.varTableNotAvailableLabel.setAlignment(Qt.AlignCenter)
         self.varTableNotAvailableLabel.setMinimumWidth(300)
@@ -103,14 +115,51 @@ class MainWindow(QMainWindow):
         self.menuTargetConnect.setShortcut('Ctrl+R')
         self.menuTargetConnect.triggered.connect(self.onMenuTargetConnect)
         self.menuTargetSettings = QAction('Settings', self)
-        self.menuTargetSettings.setShortcut('Ctrl+E')
+        self.menuTargetSettings.setShortcut('Ctrl+T')
         self.menuTargetSettings.triggered.connect(self.onMenuTargetSettings)
         self.menuTarget.addAction(self.menuTargetConnect)
         self.menuTarget.addAction(self.menuTargetSettings)
+        self.menuCameraStream = self.menuBar().addMenu('Camera Stream')
+        self.menuCameraStreamDrawBoundingBox = QAction('Draw Bounding Box', self)
+        self.menuCameraStreamDrawBoundingBox.setShortcut('Ctrl+B')
+        self.menuCameraStreamDrawBoundingBox.setCheckable(True)
+        value = self.settings.value('cameraStream/drawBoundingBox')
+        self.menuCameraStreamDrawBoundingBox.setChecked(value == 'true')
+        self.menuCameraStreamDrawEyes = QAction('Draw Eyes', self)
+        self.menuCameraStreamDrawEyes.setShortcut('Ctrl+E')
+        self.menuCameraStreamDrawEyes.setCheckable(True)
+        value = self.settings.value('cameraStream/drawEyes')
+        self.menuCameraStreamDrawEyes.setChecked(value == 'true')
+        self.menuCameraStream.addAction(self.menuCameraStreamDrawBoundingBox)
+        self.menuCameraStream.addAction(self.menuCameraStreamDrawEyes)
+        self.menuPlot = self.menuBar().addMenu('Plot')
+        self.menuPlotClear = QAction('Clear', self)
+        self.menuPlotClear.setShortcut('Ctrl+D')
+        self.menuPlotClear.triggered.connect(self.onMenuPlotClear)
+        self.menuPlot.addAction(self.menuPlotClear)
+        self.varValueChanger = VarValueChanger(self)
+        self.varValueChanger.valueChanged.connect(self.onVarValueChangerValueChanged)
         self.resize(900, 640)
 
     def closeEvent(self, event):
         self.writeSettings()
+
+    @pyqtSlot(str, str)
+    def onVarValueChangerValueChanged(self, varName, varValueStr):
+        print(varName, varValueStr)
+        self.target.setVarValue(varName, varValueStr)
+
+    @pyqtSlot(QModelIndex)
+    def onVarTableDoubleClicked(self, modelIndex):
+        if modelIndex.column() == self.VarTableColumnsNo['Value']:
+            varName = self.varTable.item(modelIndex.row(), self.VarTableColumnsNo['Name']).data(Qt.DisplayRole)
+            varReadOnly = self.variables[varName].getRdOnly()
+            if not varReadOnly:
+                varValStr = self.variables[varName].getValueStr()
+                varType = self.variables[varName].getVarType()
+                self.varValueChanger.changeValue(varName, varValStr, varType)
+            else:
+                QMessageBox.warning(self, 'Warning', 'Cannot change value. Variable is read-only.')
 
     @pyqtSlot(list)
     def onTargetVarInfoRead(self, varInfo):
@@ -132,14 +181,14 @@ class MainWindow(QMainWindow):
                                         var.getPlotColorTableWidget())
             self.varTable.setItem(var.getRow(), self.VarTableColumnsNo['Description'], var.getDescTableItem())
 
-            if i['type'] == 'float' or i['type'] == 'int':
+            if i['type'] == 'float' or i['type'] == 'int' or i['type'] == 'bool':
                 self.varPlot.addVariable(var.getName(), var.getPlotColor(), var.getPlot())
 
         self.target.startVarStream()
 
     @pyqtSlot(list)
-    def onTargetVarValueRead(self, varValue):
-        for i in varValue:
+    def onTargetVarValuesRead(self, varValues):
+        for i in varValues:
             varName = i['name']
             varValStr = i['valStr']
             varType = self.variables[varName].getVarType()
@@ -154,6 +203,12 @@ class MainWindow(QMainWindow):
                     self.varPlot.appendValue(varName, int(varValStr))
                 except ValueError:
                     continue
+            elif varType == 'bool':
+                try:
+                    self.varPlot.appendValue(varName, int('true' == varValStr))
+                except ValueError:
+                    continue
+
         self.varPlot.updateXScale()
         self.replotCnt += 1
         if self.replotCnt >= self.VarPlotReplotOnUpdate:
@@ -162,21 +217,43 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(np.ndarray)
     def onTargetCamFrameRead(self, frame):
+        if 'faceBoundingBox' in self.variables and self.menuCameraStreamDrawBoundingBox.isChecked():
+            #Draw bounding box
+            try:
+                rectPt = eval(self.variables['faceBoundingBox'].getValueStr())
+                if len(rectPt) > 3:
+                    cv2.rectangle(frame, (rectPt[0], rectPt[1]), (rectPt[2], rectPt[3]), self.BoundingBoxColor, self.BoundingBoxWidth)
+            except:
+                pass
+
+            #Draw eyes
+            if 'leftEye' in self.variables and 'rightEye' in self.variables and self.menuCameraStreamDrawEyes.isChecked():
+                try:
+                    leftEyePt = eval(self.variables['leftEye'].getValueStr())
+                    for i in range(0, len(leftEyePt), 2):
+                        pt1 = (leftEyePt[i % len(leftEyePt)], leftEyePt[(i + 1) % len(leftEyePt)])
+                        pt2 = (leftEyePt[(i + 2) % len(leftEyePt)], leftEyePt[(i + 3) % len(leftEyePt)])
+                        cv2.line(frame, pt1, pt2, self.EyesContourColor, self.EyesContourWidth)
+                    rightEyePt = eval(self.variables['rightEye'].getValueStr())
+                    for i in range(0, len(rightEyePt), 2):
+                        pt1 = (rightEyePt[i % len(rightEyePt)], rightEyePt[(i + 1) % len(rightEyePt)])
+                        pt2 = (rightEyePt[(i + 2) % len(rightEyePt)], rightEyePt[(i + 3) % len(rightEyePt)])
+                        cv2.line(frame, pt1, pt2, self.EyesContourColor, self.EyesContourWidth)
+                except:
+                    pass
         frame = cv2.resize(frame, (self.VideoStreamResolution.width(), self.VideoStreamResolution.height()))
         pixmap = utils.cvToQtPixmap(frame)
         self.camFrameView.setPixmap(pixmap)
 
-    def readSettings(self):
-        value = self.settings.value('target/addr')
-        if value:
-            self.targetAddr = str(value)
-        value = self.settings.value('target/port')
-        if value:
-            self.targetPort = int(value)
-
     def writeSettings(self):
         self.settings.setValue('target/addr', self.targetAddr)
         self.settings.setValue('target/port', self.targetPort)
+        self.settings.setValue('cameraStream/drawBoundingBox', self.menuCameraStreamDrawBoundingBox.isChecked())
+        self.settings.setValue('cameraStream/drawEyes', self.menuCameraStreamDrawEyes.isChecked())
+
+    @pyqtSlot()
+    def onMenuPlotClear(self):
+        self.varPlot.clearData()
 
     @pyqtSlot()
     def onMenuTargetConnect(self):
@@ -214,12 +291,12 @@ class MainWindow(QMainWindow):
                 self.variables[varName].setValueStr('')
                 self.variables[varName].setVarType('')
                 self.variables[varName].setRdOnly(False)
-            self.targetDisconnectClicked = False
             self.varPlot.clearData()
             if RemoteDataExchangerClient.StateConnecting == self.lastTargetState:
                 QMessageBox.warning(self, 'Warning', 'Unable to connect.')
             elif not self.targetDisconnectClicked:
                 QMessageBox.warning(self, 'Warning', 'Connection has been lost.')
+            self.targetDisconnectClicked = False
         elif RemoteDataExchangerClient.StateConnected == state:
             self.animationTimer.stop()
             self.menuTargetConnect.setText('Disconnect')

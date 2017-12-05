@@ -1,8 +1,9 @@
 #include "fatiguedetector.h"
 
-FatigueDetector::FatigueDetector(QObject *parent) :
+FatigueDetector::FatigueDetector(const FatigueDetectorParams &params, QObject *parent) :
     QObject(parent),
-    m_movAvg(15)
+    m_movAvg(params.movAvgSize),
+    m_params(params)
 {
 
 }
@@ -22,39 +23,46 @@ bool FatigueDetector::openCamera()
     return success;
 }
 
+void FatigueDetector::setParams(const FatigueDetectorParams params)
+{
+    m_params = params;
+}
+
 void FatigueDetector::detect()
 {
     cv::Mat frame;
     m_grabber.grab();
     m_grabber.retrieve(frame);
 
-    auto faces = m_faceDetector.detect(frame);
+    QVector<cv::Rect> boundingBoxes;
+    QVector<QVector<cv::Point>> faces;
+    m_faceDetector.detect(frame, boundingBoxes, faces);
 
     FatigueDetectorStat stat;
-    bool success = false;
 
-    for (auto face : faces)
+    for (int i = 0; i < faces.length(); ++i)
     {
-        auto leftEye = Utils::sliceVect<cv::Point>(face, FL68_LEFT_EYE_START_INDEX, FL68_LEFT_EYE_END_INDEX);
-        auto rightEye = Utils::sliceVect<cv::Point>(face, FL68_RIGHT_EYE_START_INDEX, FL68_RIGHT_EYE_END_INDEX);
+        auto leftEye = Utils::sliceVect<cv::Point>(faces[i], FL68_LEFT_EYE_START_INDEX, FL68_LEFT_EYE_END_INDEX);
+        auto rightEye = Utils::sliceVect<cv::Point>(faces[i], FL68_RIGHT_EYE_START_INDEX, FL68_RIGHT_EYE_END_INDEX);
 
         double leftEAR = calcEAR(leftEye);
         double rightEAR = calcEAR(rightEye);
         double rawEAR = (leftEAR + rightEAR) / 2.0;
         m_movAvg.push(rawEAR);
         double EAR = m_movAvg.get();
-        std::string strEAR = "EAR = " + std::to_string(EAR);
-        cv::putText(frame, strEAR, cv::Point(5, 15), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 255), 1);
-        Utils::drawPoly(frame, leftEye, cv::Scalar(255, 0, 0), 1);
-        Utils::drawPoly(frame, rightEye, cv::Scalar(255, 0, 0), 1);
-        success = true;
-        stat.rawEAR = rawEAR;
+
+        stat.faceDetected = true;
+        stat.EAR = rawEAR;
         stat.avgEAR = EAR;
+
+        stat.boundingBox = boundingBoxes[i];
+        stat.leftEye = leftEye;
+        stat.rightEye = rightEye;
         break;
     }
 
     emit newFrame(frame);
-    emit detected(success, stat);
+    emit detectionFinished(stat);
 }
 
 double FatigueDetector::calcEAR(const QVector<cv::Point> &eye)
