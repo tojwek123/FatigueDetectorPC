@@ -5,6 +5,7 @@
 #include <cmath>
 #include <ctime>
 #include <QVector>
+#include <QDebug>
 #include <dlib/geometry/rectangle.h>
 
 #ifdef _WIN32
@@ -52,6 +53,7 @@ public:
 
     void push(double item);
     double get();
+    void setWinSize(int winSize);
 };
 
 template<typename T>

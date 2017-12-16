@@ -44,10 +44,16 @@ double Utils::euclDist(const cv::Point &a, const cv::Point &b)
     return sqrt(diff.x * diff.x + diff.y * diff.y);
 }
 
-Utils::MovAvgDbl::MovAvgDbl(int winSize) :
-    m_winSize(winSize)
+Utils::MovAvgDbl::MovAvgDbl(int winSize)
 {
-
+    if (winSize < 1)
+    {
+        m_winSize = 1;
+    }
+    else
+    {
+        m_winSize = winSize;
+    }
 }
 
 void Utils::MovAvgDbl::push(double item)
@@ -58,12 +64,11 @@ void Utils::MovAvgDbl::push(double item)
     }
     else
     {
-        int i = 0;
-        for (i = 0; i < m_data.size() - 1; ++i)
+        for (int i = 0; i < m_data.size() - 1; ++i)
         {
             m_data[i] = m_data[i + 1];
         }
-        m_data[i] = item;
+        m_data[m_data.size() - 1] = item;
     }
 }
 
@@ -75,4 +80,17 @@ double Utils::MovAvgDbl::get()
         sum += i;
     }
     return sum / m_data.size();
+}
+
+void Utils::MovAvgDbl::setWinSize(int winSize)
+{
+    if (winSize < 1)
+    {
+        winSize = 1;
+    }
+    if (winSize < m_winSize)
+    {
+        m_data.resize(winSize);
+    }
+    m_winSize = winSize;
 }

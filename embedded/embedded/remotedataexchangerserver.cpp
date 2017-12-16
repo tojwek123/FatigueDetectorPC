@@ -68,6 +68,8 @@ QString RemoteDataExchangerServer::varTypeToStr(const VarType &type)
         return "bool";
     case VarType::Float:
         return "float";
+    case VarType::Int:
+        return "int";
     case VarType::FloatList:
         return "float[]";
     case VarType::IntList:

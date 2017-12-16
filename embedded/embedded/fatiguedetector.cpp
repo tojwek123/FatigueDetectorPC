@@ -26,6 +26,7 @@ bool FatigueDetector::openCamera()
 void FatigueDetector::setParams(const FatigueDetectorParams params)
 {
     m_params = params;
+    m_movAvg.setWinSize(params.movAvgSize);
 }
 
 void FatigueDetector::detect()
@@ -58,6 +59,7 @@ void FatigueDetector::detect()
         stat.boundingBox = boundingBoxes[i];
         stat.leftEye = leftEye;
         stat.rightEye = rightEye;
+        stat.eyesClosed = stat.avgEAR < m_params.avgEARLimit;
         break;
     }
 

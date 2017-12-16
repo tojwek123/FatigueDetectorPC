@@ -14,7 +14,7 @@
 
 struct FatigueDetectorStat
 {
-    bool fatigueDetected;
+    bool eyesClosed;
     bool faceDetected;
     double EAR;
     double avgEAR;
@@ -23,7 +23,7 @@ struct FatigueDetectorStat
     QVector<cv::Point> rightEye;
 
     FatigueDetectorStat() :
-        fatigueDetected(0),
+        eyesClosed(0),
         faceDetected(0),
         EAR(0),
         avgEAR(0),

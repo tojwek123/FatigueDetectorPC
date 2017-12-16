@@ -15,6 +15,9 @@ private:
     QString m_predictorDataPath;
     double m_avgEARLimit;
     int m_movAvgSize;
+    int m_alarmPriorityLowTimeMs;
+    int m_alarmPriorityMediumTimeMs;
+    int m_alarmPriorityHighTimeMs;
 
     static const QString PathVideoStreamJpegCompression;
     static const QString PathTcpPort;
@@ -22,6 +25,9 @@ private:
     static const QString PathPredictorDataPath;
     static const QString PathAvgEARLimit;
     static const QString PathMovAvgSize;
+    static const QString PathAlarmPriorityLowTimeMs;
+    static const QString PathAlarmPriorityMediumTimeMs;
+    static const QString PathAlarmPriorityHighTimeMs;
 
     static const int DefVideoStreamJpegCompression;
     static const int DefTcpPort;
@@ -29,6 +35,9 @@ private:
     static const QString DefPredictorDataPath;
     static const double DefAvgEARLimit;
     static const int DefMovAvgSize;
+    static const int DefAlarmPriorityLowTimeMs;
+    static const int DefAlarmPriorityMediumTimeMs;
+    static const int DefAlarmPriorityHighTimeMs;
 
 public:
     Settings();
@@ -40,6 +49,9 @@ public:
     QString predictorDataPath();
     double avgEARLimit();
     int movAvgSize();
+    int alarmPriorityLowTimeMs();
+    int alarmPriorityMediumTimeMs();
+    int alarmPriorityHighTimeMs();
 
     void saveVideoStreamJpegCompression(const int value);
     void saveTcpPort(const int value);
@@ -47,6 +59,9 @@ public:
     void savePredictorDataPath(const QString &value);
     void saveAvgEARLimit(const double value);
     void saveMovAvgSize(const int value);
+    void saveAlarmPriorityLowTimeMs(const int value);
+    void saveAlarmPriorityMediumTimeMs(const int value);
+    void saveAlarmPriorityHighTimeMs(const int value);
 };
 
 #endif // SETTINGS_H

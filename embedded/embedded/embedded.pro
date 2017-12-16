@@ -16,7 +16,8 @@ SOURCES += \
     _main.cpp \
     main.cpp \
     remotedataexchangerserver.cpp \
-    settings.cpp
+    settings.cpp \
+    alarm.cpp
 
 win32:CONFIG(release, debug|release): LIBS += -LC:/Dev/OpenCV/opencv/build/x64/vc14/lib/ -lopencv_world320
 else:win32:CONFIG(debug, debug|release): LIBS += -LC:/Dev/OpenCV/opencv/build/x64/vc14/lib/ -lopencv_world320d
@@ -36,7 +37,8 @@ unix:LIBS += -lopencv_core \
              -lraspicam_cv \
              -lmmal \
              -lmmal_core \
-             -lmmal_util
+             -lmmal_util \
+             -lwiringPi
 
 win32:INCLUDEPATH += C:/Dev/OpenCV/opencv/build/include
 win32:DEPENDPATH += C:/Dev/OpenCV/opencv/build/include
@@ -63,7 +65,8 @@ HEADERS += \
     videograbber.h \
     remotedataexchangerserver.h \
     variable.h \
-    settings.h
+    settings.h \
+    alarm.h
 
 unix:target.path = /home/pi/FatigueDetector
 unix:INSTALLS += target

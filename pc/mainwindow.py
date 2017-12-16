@@ -1,9 +1,7 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-from PyQt5.QtNetwork import *
 from PyQt5.QtGui import *
 from connectionSettings import ConnectionSettings
-import pyqtgraph as pg
 import numpy as np
 import cv2
 import utils
@@ -11,14 +9,15 @@ from remoteDataExchangerClient import RemoteDataExchangerClient
 from varPlot import VarPlot
 from variable import Variable
 from varValueChanger import VarValueChanger
+from dataLogger import DataLogger
 
 
 class MainWindow(QMainWindow):
 
     BoundingBoxColor = (255, 0, 0)
-    BoundingBoxWidth = 1
+    BoundingBoxWidth = 2
     EyesContourColor = (0, 0, 255)
-    EyesContourWidth = 1
+    EyesContourWidth = 2
     WaitingAnimation = [' |', ' /', ' -', ' \\']
     WaitingAnimationFrameDurationMs = 100
     ConnectionTimeoutMs = 5000
@@ -37,6 +36,7 @@ class MainWindow(QMainWindow):
         self.targetPort = 0
         QSettings.setPath(QSettings.IniFormat, QSettings.UserScope, QDir.currentPath())
         self.settings = QSettings(QSettings.IniFormat, QSettings.UserScope, 'config')
+        self.dataLogger = DataLogger()
         value = self.settings.value('target/addr')
         if value:
             self.targetAddr = str(value)
@@ -62,6 +62,8 @@ class MainWindow(QMainWindow):
 
     def initUI(self):
         self.setWindowTitle('Diag Tool')
+        self.exportFileDialog = QFileDialog(self, 'Export', '', 'csv table (*.csv)')
+        self.exportFileDialog.fileSelected.connect(self.onExportFileDialogFileSelected)
         self.statusBar = QStatusBar(self)
         self.targetInfo = QLabel(self)
         self.connectionStatus = QLabel('Offline', self)
@@ -133,9 +135,14 @@ class MainWindow(QMainWindow):
         self.menuCameraStream.addAction(self.menuCameraStreamDrawBoundingBox)
         self.menuCameraStream.addAction(self.menuCameraStreamDrawEyes)
         self.menuPlot = self.menuBar().addMenu('Plot')
+        self.menuPlotExport = QAction('Export to csv', self)
+        self.menuPlotExport.triggered.connect(self.onMenuPlotExport)
+        self.menuPlotExport.setShortcut('Ctrl+S')
+        self.menuPlotExport.setEnabled(False)
         self.menuPlotClear = QAction('Clear', self)
         self.menuPlotClear.setShortcut('Ctrl+D')
         self.menuPlotClear.triggered.connect(self.onMenuPlotClear)
+        self.menuPlot.addAction(self.menuPlotExport)
         self.menuPlot.addAction(self.menuPlotClear)
         self.varValueChanger = VarValueChanger(self)
         self.varValueChanger.valueChanged.connect(self.onVarValueChangerValueChanged)
@@ -144,9 +151,16 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.writeSettings()
 
+    @pyqtSlot()
+    def onMenuPlotExport(self):
+        self.exportFileDialog.show()
+
+    @pyqtSlot(str)
+    def onExportFileDialogFileSelected(self, file):
+        self.dataLogger.save(file)
+
     @pyqtSlot(str, str)
     def onVarValueChangerValueChanged(self, varName, varValueStr):
-        print(varName, varValueStr)
         self.target.setVarValue(varName, varValueStr)
 
     @pyqtSlot(QModelIndex)
@@ -215,6 +229,8 @@ class MainWindow(QMainWindow):
             self.varPlot.replot()
             self.replotCnt = 0
 
+        self.dataLogger.appendData(varValues)
+
     @pyqtSlot(np.ndarray)
     def onTargetCamFrameRead(self, frame):
         if 'faceBoundingBox' in self.variables and self.menuCameraStreamDrawBoundingBox.isChecked():
@@ -226,21 +242,21 @@ class MainWindow(QMainWindow):
             except:
                 pass
 
-            #Draw eyes
-            if 'leftEye' in self.variables and 'rightEye' in self.variables and self.menuCameraStreamDrawEyes.isChecked():
-                try:
-                    leftEyePt = eval(self.variables['leftEye'].getValueStr())
-                    for i in range(0, len(leftEyePt), 2):
-                        pt1 = (leftEyePt[i % len(leftEyePt)], leftEyePt[(i + 1) % len(leftEyePt)])
-                        pt2 = (leftEyePt[(i + 2) % len(leftEyePt)], leftEyePt[(i + 3) % len(leftEyePt)])
-                        cv2.line(frame, pt1, pt2, self.EyesContourColor, self.EyesContourWidth)
-                    rightEyePt = eval(self.variables['rightEye'].getValueStr())
-                    for i in range(0, len(rightEyePt), 2):
-                        pt1 = (rightEyePt[i % len(rightEyePt)], rightEyePt[(i + 1) % len(rightEyePt)])
-                        pt2 = (rightEyePt[(i + 2) % len(rightEyePt)], rightEyePt[(i + 3) % len(rightEyePt)])
-                        cv2.line(frame, pt1, pt2, self.EyesContourColor, self.EyesContourWidth)
-                except:
-                    pass
+        #Draw eyes
+        if 'leftEye' in self.variables and 'rightEye' in self.variables and self.menuCameraStreamDrawEyes.isChecked():
+            try:
+                leftEyePt = eval(self.variables['leftEye'].getValueStr())
+                for i in range(0, len(leftEyePt), 2):
+                    pt1 = (leftEyePt[i % len(leftEyePt)], leftEyePt[(i + 1) % len(leftEyePt)])
+                    pt2 = (leftEyePt[(i + 2) % len(leftEyePt)], leftEyePt[(i + 3) % len(leftEyePt)])
+                    cv2.line(frame, pt1, pt2, self.EyesContourColor, self.EyesContourWidth)
+                rightEyePt = eval(self.variables['rightEye'].getValueStr())
+                for i in range(0, len(rightEyePt), 2):
+                    pt1 = (rightEyePt[i % len(rightEyePt)], rightEyePt[(i + 1) % len(rightEyePt)])
+                    pt2 = (rightEyePt[(i + 2) % len(rightEyePt)], rightEyePt[(i + 3) % len(rightEyePt)])
+                    cv2.line(frame, pt1, pt2, self.EyesContourColor, self.EyesContourWidth)
+            except:
+                pass
         frame = cv2.resize(frame, (self.VideoStreamResolution.width(), self.VideoStreamResolution.height()))
         pixmap = utils.cvToQtPixmap(frame)
         self.camFrameView.setPixmap(pixmap)
@@ -254,6 +270,7 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def onMenuPlotClear(self):
         self.varPlot.clearData()
+        self.dataLogger.clear()
 
     @pyqtSlot()
     def onMenuTargetConnect(self):
@@ -267,6 +284,8 @@ class MainWindow(QMainWindow):
             self.replotCnt = 0
             self.targetDisconnectClicked = True
             self.menuTargetConnect.setEnabled(False)
+            self.menuPlotExport.setEnabled(False)
+            self.dataLogger.stop()
             self.target.disconnect()
 
     @pyqtSlot()
@@ -301,6 +320,8 @@ class MainWindow(QMainWindow):
             self.animationTimer.stop()
             self.menuTargetConnect.setText('Disconnect')
             self.menuTargetConnect.setEnabled(True)
+            self.menuPlotExport.setEnabled(True)
+            self.dataLogger.start()
             self.connectionStatus.setText('Online')
             self.varTable.setVisible(True)
             self.varTableNotAvailableLabel.setVisible(False)

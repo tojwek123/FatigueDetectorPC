@@ -7,10 +7,16 @@ MainApplication::MainApplication(int &argc, char **argv) :
     m_varStreamOn(false)
 {
     qRegisterMetaType<FatigueDetectorStat>("FatigueDetectorStat");
+    qRegisterMetaType<FatigueDetectorParams>("FatigueDetectorParams");
     qRegisterMetaType<cv::Mat>("cv::Mat");
 
     /* Load settings from file */
     m_settings.loadFromFile();
+
+    m_alarm = new Alarm(m_settings.alarmPriorityLowTimeMs(),
+                        m_settings.alarmPriorityMediumTimeMs(),
+                        m_settings.alarmPriorityHighTimeMs(),
+                        this);
 
     m_fatigueDetectorParams.avgEARLimit = m_settings.avgEARLimit();
     m_fatigueDetectorParams.movAvgSize = m_settings.movAvgSize();
@@ -45,7 +51,6 @@ MainApplication::MainApplication(int &argc, char **argv) :
     connect(&m_dataExchangerServer, &RemoteDataExchangerServer::newRequest,
             this, &MainApplication::onDataExchangerNewRequest);
 
-
     m_perfTimer.start();
     m_dataExchangerServer.listen(m_settings.tcpPort());
 
@@ -76,6 +81,13 @@ MainApplication::MainApplication(int &argc, char **argv) :
     avgEARLimit.value = m_settings.avgEARLimit();
     m_variables.insert(avgEARLimit.name, avgEARLimit);
 
+    Variable movAvgSize;
+    movAvgSize.name = "movAvgSize";
+    movAvgSize.type = VarType::Int;
+    movAvgSize.readOnly = false;
+    movAvgSize.value = m_settings.movAvgSize();
+    m_variables.insert(movAvgSize.name, movAvgSize);
+
     Variable faceDetected;
     faceDetected.name = "faceDetected";
     faceDetected.type = VarType::Bool;
@@ -83,12 +95,12 @@ MainApplication::MainApplication(int &argc, char **argv) :
     faceDetected.value = false;
     m_variables.insert(faceDetected.name, faceDetected);
 
-    Variable fatigueDetected;
-    fatigueDetected.name = "fatigueDetected";
-    fatigueDetected.type = VarType::Bool;
-    fatigueDetected.readOnly = true;
-    fatigueDetected.value = false;
-    m_variables.insert(fatigueDetected.name, fatigueDetected);
+    Variable eyesClosed;
+    eyesClosed.name = "eyesClosed";
+    eyesClosed.type = VarType::Bool;
+    eyesClosed.readOnly = true;
+    eyesClosed.value = false;
+    m_variables.insert(eyesClosed.name, eyesClosed);
 
     Variable faceBoundingBox;
     faceBoundingBox.name = "faceBoundingBox";
@@ -110,6 +122,27 @@ MainApplication::MainApplication(int &argc, char **argv) :
     rightEye.readOnly = true;
     rightEye.value = QVariant::fromValue(QList<int>());
     m_variables.insert(rightEye.name, rightEye);
+
+    Variable alarmPriorityLowTimeMs;
+    alarmPriorityLowTimeMs.name = "alarmPriorityLowTimeMs";
+    alarmPriorityLowTimeMs.type = VarType::Int;
+    alarmPriorityLowTimeMs.readOnly = false;
+    alarmPriorityLowTimeMs.value = m_settings.alarmPriorityLowTimeMs();
+    m_variables.insert(alarmPriorityLowTimeMs.name, alarmPriorityLowTimeMs);
+
+    Variable alarmPriorityMediumTimeMs;
+    alarmPriorityMediumTimeMs.name = "alarmPriorityMediumTimeMs";
+    alarmPriorityMediumTimeMs.type = VarType::Int;
+    alarmPriorityMediumTimeMs.readOnly = false;
+    alarmPriorityMediumTimeMs.value = m_settings.alarmPriorityMediumTimeMs();
+    m_variables.insert(alarmPriorityMediumTimeMs.name, alarmPriorityMediumTimeMs);
+
+    Variable alarmPriorityHighTimeMs;
+    alarmPriorityHighTimeMs.name = "alarmPriorityHighTimeMs";
+    alarmPriorityHighTimeMs.type = VarType::Int;
+    alarmPriorityHighTimeMs.readOnly = false;
+    alarmPriorityHighTimeMs.value = m_settings.alarmPriorityHighTimeMs();
+    m_variables.insert(alarmPriorityHighTimeMs.name, alarmPriorityHighTimeMs);
 }
 
 MainApplication::~MainApplication()
@@ -153,10 +186,21 @@ void MainApplication::onCameraOpened(bool success)
 
 void MainApplication::onDetectionFinished(FatigueDetectorStat stat)
 {
+    emit detect();
+
+    if (stat.eyesClosed && !m_alarm->isRunning())
+    {
+        m_alarm->start();
+    }
+    else if (!stat.eyesClosed && m_alarm->isRunning())
+    {
+        m_alarm->stop();
+    }
+
     m_variables["EAR"].value = stat.EAR;
     m_variables["avgEAR"].value = stat.avgEAR;
     m_variables["faceDetected"].value = stat.faceDetected;
-    m_variables["fatigueDetected"].value = stat.fatigueDetected;
+    m_variables["eyesClosed"].value = stat.eyesClosed;
 
     QList<int> boundingBoxList = {stat.boundingBox.x,
                                   stat.boundingBox.y,
@@ -179,8 +223,6 @@ void MainApplication::onDetectionFinished(FatigueDetectorStat stat)
         rightEyeList.append(i.y);
     }
     m_variables["rightEye"].value = QVariant::fromValue(rightEyeList);
-
-    emit detect();
 }
 
 void MainApplication::onDataExchangerClientStateChanged(bool connected)
@@ -230,7 +272,32 @@ void MainApplication::onDataExchangerNewRequest(RemoteRequest request, QVector<Q
             if (m_variables.contains(varName))
             {
                 m_variables[varName].value = args[1];
-                //Validation needed
+                //TODO: Validation needed
+
+                if ("avgEARLimit" == varName)
+                {
+                    m_fatigueDetectorParams.avgEARLimit = args[1].toDouble();
+                    emit setFatigueDetectorParams(m_fatigueDetectorParams);
+                    m_settings.saveAvgEARLimit(m_fatigueDetectorParams.avgEARLimit);
+                }
+                else if ("movAvgSize" == varName)
+                {
+                    m_fatigueDetectorParams.movAvgSize = args[1].toInt();
+                    emit setFatigueDetectorParams(m_fatigueDetectorParams);
+                    m_settings.saveMovAvgSize(m_fatigueDetectorParams.movAvgSize);
+                }
+                else if ("alarmPriorityLowTimeMs" == varName)
+                {
+                    m_alarm->setLowPriorityTimeMs(args[1].toInt());
+                }
+                else if ("alarmPriorityMediumTimeMs" == varName)
+                {
+                    m_alarm->setMediumPriorityTimeMs(args[1].toInt());
+                }
+                else if ("alarmPriorityHighTimeMs" == varName)
+                {
+                    m_alarm->setHighPriorityTimeMs(args[1].toInt());
+                }
             }
         }
     }

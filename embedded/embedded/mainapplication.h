@@ -11,6 +11,7 @@
 #include "settings.h"
 #include "fatiguedetector.h"
 #include "remotedataexchangerserver.h"
+#include "alarm.h"
 
 class MainApplication : public QCoreApplication
 {
@@ -28,6 +29,7 @@ private:
     QTimer m_varStreamTimer;
     QMap<QString, Variable> m_variables;
     Settings m_settings;
+    Alarm *m_alarm;
 
     static const int VarStreamTimerPeriodMs = 100;
 
